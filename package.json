@@ -1,0 +1,50 @@
+{
+  "name": "@tobotorui/moltbot-wecom-channel",
+  "version": "1.1.0",
+  "type": "module",
+  "description": "企业微信（WeCom）频道插件，用于 Moltbot (Clawdbot) - 修复版",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "moltbot",
+    "clawdbot",
+    "wecom",
+    "wechat",
+    "enterprise",
+    "wework",
+    "plugin",
+    "channel"
+  ],
+  "author": "toboto <https://github.com/toboto> (NPM: tobotorui)",
+  "contributors": [
+    "william.qian (原始作者)"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toboto/moltbot-wecom-channel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/toboto/moltbot-wecom-channel/issues"
+  },
+  "homepage": "https://github.com/toboto/moltbot-wecom-channel#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "clawdbot": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.3.4"
+  },
+  "peerDependencies": {
+    "clawdbot": "*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
