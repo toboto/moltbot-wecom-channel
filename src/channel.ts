@@ -53,17 +53,34 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
             enabled: account?.enabled ?? simpleWecom?.enabled ?? true,
             config: config,
             tokenSource: "config",
-            token: "",
+            token: config.token || "",
         };
     },
     defaultAccountId: () => DEFAULT_ACCOUNT_ID,
-    describeAccount: (account) => ({
-      accountId: account.accountId,
-      name: account.name,
-      enabled: account.enabled,
-      configured: true,
-      tokenSource: "config",
-    }),
+    isConfigured: (account) => {
+      // WeCom requires corpid, agentid, and token to be configured
+      const config = account.config as any;
+      return Boolean(
+        config?.corpid?.trim() &&
+        config?.agentid &&
+        config?.token?.trim()
+      );
+    },
+    describeAccount: (account) => {
+      const config = account.config as any;
+      const isConfigured = Boolean(
+        config?.corpid?.trim() &&
+        config?.agentid &&
+        config?.token?.trim()
+      );
+      return {
+        accountId: account.accountId,
+        name: account.name,
+        enabled: account.enabled,
+        configured: isConfigured,
+        tokenSource: "config",
+      };
+    },
   },
   outbound: {
     deliveryMode: "direct",
