@@ -1,6 +1,5 @@
 import {
   buildChannelConfigSchema,
-  getChatChannelMeta,
   type ChannelPlugin,
   type ResolvedChannelAccount,
   DEFAULT_ACCOUNT_ID
@@ -13,15 +12,21 @@ import type { z } from "zod";
 type WecomConfig = z.infer<typeof SimpleWecomConfigSchema>;
 type ResolvedWecomAccount = ResolvedChannelAccount<WecomConfig>;
 
-const meta = getChatChannelMeta("wecom");
+const meta = {
+  id: "wecom",
+  label: "WeCom",
+  selectionLabel: "WeCom (Enterprise WeChat)",
+  docsPath: "/channels/wecom",
+  docsLabel: "wecom",
+  blurb: "Enterprise WeChat (WeCom) channel integration.",
+  aliases: ["wechat", "wework"],
+  order: 90,
+  quickstartAllowFrom: true,
+};
 
 export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
   id: "wecom",
-  meta: {
-    ...meta,
-    name: "WeCom",
-    description: "Enterprise WeChat (WeCom) Integration",
-  },
+  meta,
   capabilities: {
     chatTypes: ["direct"],
     media: true,
