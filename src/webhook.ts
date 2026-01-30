@@ -1,8 +1,6 @@
-import type { ChannelGatewayContext } from "openclaw/plugin-sdk";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { getWecomRuntime } from "./runtime.js";
-import type { IncomingMessage } from "node:http";
 import { wecomClient, type SimpleWecomMessage } from "./client.js";
-import { parseMultipart } from "./multipart.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -10,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { verifySignature, decryptMessage, calculateSignature } from "./crypto.js";
 import { parseWeComMessage, formatMessageForClawdbot } from "./message-parser.js";
 import { XMLParser } from "fast-xml-parser";
+import { parseMultipart } from "./multipart.js";
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -19,155 +18,132 @@ async function readBody(req: IncomingMessage): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-export function startWecomAccount(ctx: ChannelGatewayContext) {
-  const accountId = ctx.account.accountId;
-  const config = ctx.account.config as any;
+/**
+ * HTTP webhook handler for WeCom messages
+ * Returns true if the request was handled, false otherwise
+ */
+export async function handleWecomWebhookRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<boolean> {
+  const url = new URL(req.url ?? "/", "http://localhost");
 
-  // Get runtime for HTTP route registration
+  // Only handle /wecom/message path
+  if (url.pathname !== "/wecom/message") {
+    return false;
+  }
+
   const runtime = getWecomRuntime();
+  const cfg = await runtime.config.loadConfig();
+  const wecom = cfg.channels?.["wecom"];
 
-  // Register POST/GET /wecom/message
-  const unregisterMessage = runtime.channel.registerPluginHttpRoute({
-    pluginId: "wecom",
-    accountId,
-    path: "/wecom/message",
-    handler: async (req, res) => {
-      const url = new URL(req.url || "", `http://${req.headers.host}`);
+  if (!wecom) {
+    res.statusCode = 500;
+    res.end("WeCom channel not configured");
+    return true;
+  }
 
-      // ===== GET 请求：URL 验证（企业微信首次配置时） =====
-      if (req.method === "GET") {
-        const msgSignature = url.searchParams.get("msg_signature");
-        const timestamp = url.searchParams.get("timestamp");
-        const nonce = url.searchParams.get("nonce");
-        const echostr = url.searchParams.get("echostr");
+  const config = wecom as any;
+  const accountId = "default"; // TODO: support multiple accounts
 
-        const token = config.token;
+  // ===== GET request: URL verification (for WeCom initial setup) =====
+  if (req.method === "GET") {
+    const msgSignature = url.searchParams.get("msg_signature");
+    const timestamp = url.searchParams.get("timestamp");
+    const nonce = url.searchParams.get("nonce");
+    const echostr = url.searchParams.get("echostr");
 
-        if (!token) {
-          res.statusCode = 500;
-          res.end("Token not configured");
-          return;
-        }
+    const token = config.token;
 
-        if (!msgSignature || !timestamp || !nonce || !echostr) {
-          res.statusCode = 400;
-          res.end("Missing required parameters");
-          return;
-        }
+    if (!token) {
+      res.statusCode = 500;
+      res.end("Token not configured");
+      return true;
+    }
 
-        try {
-          // 验证签名
-          const expectedSignature = calculateSignature(token, timestamp, nonce, echostr);
-          if (expectedSignature !== msgSignature) {
-            res.statusCode = 403;
-            res.end("Invalid signature");
-            return;
-          }
+    if (!msgSignature || !timestamp || !nonce || !echostr) {
+      res.statusCode = 400;
+      res.end("Missing required parameters");
+      return true;
+    }
 
-          // 解密 echostr 并返回
-          const encodingAESKey = config.encodingAESKey;
-          const corpid = config.corpid;
-
-          if (!encodingAESKey || !corpid) {
-            res.statusCode = 500;
-            res.end("encodingAESKey or corpid not configured");
-            return;
-          }
-
-          const decryptedEchoStr = decryptMessage(encodingAESKey, echostr, corpid);
-          res.statusCode = 200;
-          res.setHeader("Content-Type", "text/plain");
-          res.end(decryptedEchoStr);
-        } catch (error) {
-          console.error("WeChat verification failed:", error);
-          res.statusCode = 500;
-          res.end(String(error));
-        }
-        return;
+    try {
+      // Verify signature
+      const expectedSignature = calculateSignature(token, timestamp, nonce, echostr);
+      if (expectedSignature !== msgSignature) {
+        res.statusCode = 403;
+        res.end("Invalid signature");
+        return true;
       }
 
-      // ===== POST 请求：接收消息 =====
-      if (req.method !== "POST") {
-        res.statusCode = 405;
-        res.end("Method Not Allowed");
-        return;
+      // Decrypt echostr and return
+      const encodingAESKey = config.encodingAESKey;
+      const corpid = config.corpid;
+
+      if (!encodingAESKey || !corpid) {
+        res.statusCode = 500;
+        res.end("encodingAESKey or corpid not configured");
+        return true;
       }
 
-      try {
-        const contentType = req.headers["content-type"] || "";
+      const decryptedEchoStr = decryptMessage(encodingAESKey, echostr, corpid);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/plain");
+      res.end(decryptedEchoStr);
+    } catch (error) {
+      console.error("WeChat verification failed:", error);
+      res.statusCode = 500;
+      res.end(String(error));
+    }
+    return true;
+  }
 
-        // 检测是否为企业微信加密消息（XML 格式）
-        const isEncryptedWeComMessage =
-          contentType.includes("text/xml") ||
-          contentType.includes("application/xml") ||
-          url.searchParams.has("msg_signature");
+  // ===== POST request: receive messages =====
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.end("Method Not Allowed");
+    return true;
+  }
 
-        if (isEncryptedWeComMessage) {
-          // ===== 处理企业微信加密消息 =====
-          await handleEncryptedWeComMessage(req, res, url, ctx, accountId);
-        } else {
-          // ===== 处理原有的 JSON/Multipart 格式（向后兼容）=====
-          await handleLegacyMessage(req, res, contentType, ctx, accountId);
-        }
-      } catch (e) {
-        console.error("WeCom handler error:", e);
-        if (!res.writableEnded) {
-          res.statusCode = 500;
-          res.end(String(e));
-        }
-      }
-    },
-  });
+  try {
+    const contentType = req.headers["content-type"] || "";
 
-  // Register GET /wecom/messages
-  const unregisterPoll = runtime.channel.registerPluginHttpRoute({
-    pluginId: "wecom",
-    accountId,
-    path: "/wecom/messages",
-    handler: async (req, res) => {
-      if (req.method !== "GET") {
-        res.statusCode = 405;
-        res.end("Method Not Allowed");
-        return;
-      }
+    // Detect if this is an encrypted WeCom message (XML format)
+    const isEncryptedWeComMessage =
+      contentType.includes("text/xml") ||
+      contentType.includes("application/xml") ||
+      url.searchParams.has("msg_signature");
 
-      // Parse query params manually or use URL
-      const url = new URL(req.url || "", `http://${req.headers.host}`);
-      const email = url.searchParams.get("email");
+    if (isEncryptedWeComMessage) {
+      // ===== Handle encrypted WeCom message =====
+      await handleEncryptedWeComMessage(req, res, url, config, accountId, cfg);
+    } else {
+      // ===== Handle legacy JSON/Multipart format (backwards compatible) =====
+      await handleLegacyMessage(req, res, contentType, config, accountId, cfg);
+    }
+  } catch (e) {
+    console.error("WeCom handler error:", e);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(String(e));
+    }
+  }
 
-      if (!email) {
-        res.statusCode = 400;
-        res.end("Missing email param");
-        return;
-      }
-
-      const messages = wecomClient.getPendingMessages(email);
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ messages }));
-    },
-  });
-
-  return {
-    stop: () => {
-      unregisterMessage();
-      unregisterPoll();
-    },
-  };
+  return true;
 }
 
 /**
- * 处理企业微信加密消息
+ * Handle encrypted WeCom message
  */
 async function handleEncryptedWeComMessage(
   req: IncomingMessage,
-  res: any,
+  res: ServerResponse,
   url: URL,
-  ctx: ChannelGatewayContext,
-  accountId: string
+  config: any,
+  accountId: string,
+  cfg: any,
 ) {
-  const config = ctx.account.config as any;
-
-  // 1. 获取验证参数
+  // 1. Get verification parameters
   const msgSignature = url.searchParams.get("msg_signature");
   const timestamp = url.searchParams.get("timestamp");
   const nonce = url.searchParams.get("nonce");
@@ -188,14 +164,14 @@ async function handleEncryptedWeComMessage(
     return;
   }
 
-  // 2. 读取请求体（XML）
+  // 2. Read request body (XML)
   const rawBody = await readBody(req);
   const xmlString = rawBody.toString("utf8");
 
   console.log("=== Received WeChat Encrypted Message ===");
   console.log("XML:", xmlString);
 
-  // 3. 解析 XML 提取 Encrypt 字段
+  // 3. Parse XML to extract Encrypt field
   const parser = new XMLParser({
     ignoreAttributes: false,
     parseTagValue: false,
@@ -211,7 +187,7 @@ async function handleEncryptedWeComMessage(
     return;
   }
 
-  // 4. 验证签名
+  // 4. Verify signature
   const isValid = verifySignature(token, timestamp, nonce, encryptedMsg, msgSignature);
   if (!isValid) {
     console.error("Invalid message signature");
@@ -220,7 +196,7 @@ async function handleEncryptedWeComMessage(
     return;
   }
 
-  // 5. 解密消息
+  // 5. Decrypt message
   let decryptedXml: string;
   try {
     decryptedXml = decryptMessage(encodingAESKey, encryptedMsg, corpid);
@@ -233,12 +209,12 @@ async function handleEncryptedWeComMessage(
     return;
   }
 
-  // 6. 解析企业微信消息
+  // 6. Parse WeCom message
   const wecomMessage = parseWeComMessage(decryptedXml);
   console.log("=== Parsed WeChat Message ===");
   console.log(JSON.stringify(wecomMessage, null, 2));
 
-  // 7. 转换为 Clawdbot 格式
+  // 7. Convert to Clawdbot format
   const { text, mediaUrls } = formatMessageForClawdbot(wecomMessage);
   const userId = wecomMessage.FromUserName;
 
@@ -248,12 +224,12 @@ async function handleEncryptedWeComMessage(
   console.log("MediaUrls:", mediaUrls);
   console.log("===================================");
 
-  // 8. 立即返回 success（企业微信要求5秒内响应）
+  // 8. Return success immediately (WeCom requires response within 5 seconds)
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/plain");
   res.end("success");
 
-  // 9. 异步处理消息
+  // 9. Process message asynchronously
   const systemPrompt = config.systemPrompt?.trim() || undefined;
 
   // Dispatch
@@ -267,7 +243,7 @@ async function handleEncryptedWeComMessage(
       MediaUrls: mediaUrls,
       GroupSystemPrompt: systemPrompt,
     },
-    cfg: ctx.cfg,
+    cfg,
     dispatcherOptions: {
       responsePrefix: "",
       deliver: async (payload) => {
@@ -304,14 +280,15 @@ async function handleEncryptedWeComMessage(
 }
 
 /**
- * 处理原有的 JSON/Multipart 格式消息（向后兼容）
+ * Handle legacy JSON/Multipart format messages (backwards compatible)
  */
 async function handleLegacyMessage(
   req: IncomingMessage,
-  res: any,
+  res: ServerResponse,
   contentType: string,
-  ctx: ChannelGatewayContext,
-  accountId: string
+  config: any,
+  accountId: string,
+  cfg: any,
 ) {
   let email: string | undefined;
   let text: string | undefined;
@@ -375,7 +352,7 @@ async function handleLegacyMessage(
     mediaUrls.push(`file://${file.path}`);
   }
 
-  // 将文件路径添加到消息文本中，让 LLM 能看到
+  // Add file paths to message text for LLM to see
   let enrichedText = text || "";
   if (files.length > 0) {
     enrichedText += "\n\n[上传的文件]";
@@ -392,7 +369,6 @@ async function handleLegacyMessage(
   console.log("===================================");
 
   // Read systemPrompt from config
-  const config = ctx.account.config as any;
   const systemPrompt = config.systemPrompt?.trim() || undefined;
 
   // Dispatch
@@ -406,7 +382,7 @@ async function handleLegacyMessage(
       MediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
       GroupSystemPrompt: systemPrompt,
     },
-    cfg: ctx.cfg,
+    cfg,
     dispatcherOptions: {
       responsePrefix: "",
       deliver: async (payload) => {
@@ -415,7 +391,6 @@ async function handleLegacyMessage(
         console.log("MediaUrl:", payload.mediaUrl);
         console.log("================================");
 
-        const config = ctx.account.config as any;
         const msg: SimpleWecomMessage = {
           text: payload.text,
           mediaUrl: payload.mediaUrl

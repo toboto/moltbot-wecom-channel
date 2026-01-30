@@ -1,12 +1,12 @@
-import type { PluginRuntime } from "clawdbot/plugin-sdk";
+import type { PluginRuntime } from "openclaw/plugin-sdk";
 
 let _runtime: PluginRuntime | undefined;
 
-export function setSimpleWecomRuntime(runtime: PluginRuntime) {
+export function setWecomRuntime(runtime: PluginRuntime) {
   _runtime = runtime;
 }
 
-export function getSimpleWecomRuntime() {
-  if (!_runtime) throw new Error("SimpleWeCom runtime not initialized");
+export function getWecomRuntime() {
+  if (!_runtime) throw new Error("WeCom runtime not initialized");
   return _runtime;
 }

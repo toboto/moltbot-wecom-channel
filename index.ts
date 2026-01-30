@@ -1,16 +1,18 @@
-import type { ClawdbotPluginApi } from "clawdbot/plugin-sdk";
-import { emptyPluginConfigSchema } from "clawdbot/plugin-sdk";
-import { simpleWecomPlugin } from "./src/channel.js";
-import { setSimpleWecomRuntime } from "./src/runtime.js";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
+import { wecomPlugin } from "./src/channel.js";
+import { setWecomRuntime } from "./src/runtime.js";
+import { handleWecomWebhookRequest } from "./src/webhook.js";
 
 const plugin = {
-  id: "simple-wecom",
-  name: "Simple WeCom",
-  description: "Generic HTTP-based WeCom integration",
+  id: "wecom",
+  name: "WeCom (企业微信)",
+  description: "Enterprise WeChat (WeCom) channel integration",
   configSchema: emptyPluginConfigSchema(),
-  register(api: ClawdbotPluginApi) {
-    setSimpleWecomRuntime(api.runtime);
-    api.registerChannel({ plugin: simpleWecomPlugin });
+  register(api: OpenClawPluginApi) {
+    setWecomRuntime(api.runtime);
+    api.registerChannel({ plugin: wecomPlugin });
+    api.registerHttpHandler(handleWecomWebhookRequest);
   },
 };
 

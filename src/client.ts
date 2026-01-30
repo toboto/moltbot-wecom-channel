@@ -69,7 +69,7 @@ export class SimpleWecomClient {
         pendingRes.end(JSON.stringify(message));
         return;
       } catch (e) {
-        console.error("SimpleWeCom: Failed to write sync response", e);
+        console.error("WeCom: Failed to write sync response", e);
         // Fallback to next method
       }
     }
@@ -204,4 +204,4 @@ export class SimpleWecomClient {
   }
 }
 
-export const simpleWecomClient = new SimpleWecomClient();
+export const wecomClient = new SimpleWecomClient();

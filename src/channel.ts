@@ -3,22 +3,21 @@ import {
   type ChannelPlugin,
   type ResolvedChannelAccount,
   DEFAULT_ACCOUNT_ID
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 import { SimpleWecomConfigSchema, type SimpleWecomAccountConfigSchema } from "./config-schema.js";
-import { startSimpleWecomAccount } from "./gateway.js";
-import { simpleWecomClient } from "./client.js";
-import { getSimpleWecomRuntime } from "./runtime.js";
+import { wecomClient } from "./client.js";
+import { getWecomRuntime } from "./runtime.js";
 import type { z } from "zod";
 
-type SimpleWecomConfig = z.infer<typeof SimpleWecomConfigSchema>;
-type ResolvedSimpleWecomAccount = ResolvedChannelAccount<SimpleWecomConfig>;
+type WecomConfig = z.infer<typeof SimpleWecomConfigSchema>;
+type ResolvedWecomAccount = ResolvedChannelAccount<WecomConfig>;
 
-export const simpleWecomPlugin: ChannelPlugin<ResolvedSimpleWecomAccount> = {
-  id: "simple-wecom",
+export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
+  id: "wecom",
   meta: {
-    id: "simple-wecom",
-    name: "Simple WeCom",
-    description: "Generic HTTP WeCom Integration",
+    id: "wecom",
+    name: "WeCom",
+    description: "Enterprise WeChat (WeCom) Integration",
     hidden: false,
     quickstartAllowFrom: true,
   },
@@ -31,7 +30,7 @@ export const simpleWecomPlugin: ChannelPlugin<ResolvedSimpleWecomAccount> = {
   configSchema: buildChannelConfigSchema(SimpleWecomConfigSchema),
   config: {
     listAccountIds: (cfg) => {
-        const accounts = cfg.channels?.["simple-wecom"]?.accounts;
+        const accounts = cfg.channels?.["wecom"]?.accounts;
         const ids = accounts ? Object.keys(accounts) : [];
         if (ids.length === 0 || !ids.includes(DEFAULT_ACCOUNT_ID)) {
              ids.unshift(DEFAULT_ACCOUNT_ID);
@@ -39,12 +38,12 @@ export const simpleWecomPlugin: ChannelPlugin<ResolvedSimpleWecomAccount> = {
         return ids;
     },
     resolveAccount: (cfg, accountId) => {
-        const simpleWecom = cfg.channels?.["simple-wecom"];
+        const simpleWecom = cfg.channels?.["wecom"];
         const resolvedId = accountId ?? DEFAULT_ACCOUNT_ID;
         const account = simpleWecom?.accounts?.[resolvedId];
         const defaults = { ...simpleWecom };
         if (defaults.accounts) delete defaults.accounts;
-        
+
         // Merge defaults and account config
         const config = { ...defaults, ...account } as any;
 
@@ -66,22 +65,19 @@ export const simpleWecomPlugin: ChannelPlugin<ResolvedSimpleWecomAccount> = {
       tokenSource: "config",
     }),
   },
-  gateway: {
-    startAccount: startSimpleWecomAccount,
-  },
   outbound: {
     deliveryMode: "direct",
     sendText: async ({ to, text, accountId }) => {
-        const runtime = getSimpleWecomRuntime();
+        const runtime = getWecomRuntime();
         const cfg = await runtime.config.loadConfig();
-        const simpleWecom = cfg.channels?.["simple-wecom"];
+        const wecom = cfg.channels?.["wecom"];
         const resolvedId = accountId ?? DEFAULT_ACCOUNT_ID;
-        const account = simpleWecom?.accounts?.[resolvedId];
-        const defaults = { ...simpleWecom };
+        const account = wecom?.accounts?.[resolvedId];
+        const defaults = { ...wecom };
         if (defaults.accounts) delete defaults.accounts;
         const config = { ...defaults, ...account } as any;
 
-        await simpleWecomClient.sendMessage(to, { text }, {
+        await wecomClient.sendMessage(to, { text }, {
             webhookUrl: config.webhookUrl,
             webhookToken: config.webhookToken,
             weworkApiUrl: config.weworkApiUrl,
@@ -95,19 +91,19 @@ export const simpleWecomPlugin: ChannelPlugin<ResolvedSimpleWecomAccount> = {
             encodingAESKey: config.encodingAESKey
         });
 
-        return { channel: "simple-wecom", ok: true };
+        return { channel: "wecom", ok: true };
     },
     sendMedia: async ({ to, text, mediaUrl, accountId }) => {
-        const runtime = getSimpleWecomRuntime();
+        const runtime = getWecomRuntime();
         const cfg = await runtime.config.loadConfig();
-        const simpleWecom = cfg.channels?.["simple-wecom"];
+        const wecom = cfg.channels?.["wecom"];
         const resolvedId = accountId ?? DEFAULT_ACCOUNT_ID;
-        const account = simpleWecom?.accounts?.[resolvedId];
-        const defaults = { ...simpleWecom };
+        const account = wecom?.accounts?.[resolvedId];
+        const defaults = { ...wecom };
         if (defaults.accounts) delete defaults.accounts;
         const config = { ...defaults, ...account } as any;
 
-        await simpleWecomClient.sendMessage(to, { text, mediaUrl }, {
+        await wecomClient.sendMessage(to, { text, mediaUrl }, {
             webhookUrl: config.webhookUrl,
             webhookToken: config.webhookToken,
             weworkApiUrl: config.weworkApiUrl,
@@ -121,7 +117,7 @@ export const simpleWecomPlugin: ChannelPlugin<ResolvedSimpleWecomAccount> = {
             encodingAESKey: config.encodingAESKey
         });
 
-        return { channel: "simple-wecom", ok: true };
+        return { channel: "wecom", ok: true };
     }
   },
 };

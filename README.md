@@ -1,64 +1,55 @@
-# Moltbot WeCom Channel
+# OpenClaw WeCom Channel
 
-企业微信（WeCom/WeChat Work）频道插件，用于 [Moltbot](https://github.com/moltbot/moltbot)（原 Clawdbot）。
+企业微信（WeCom/WeChat Work）频道插件，用于 [OpenClaw](https://openclaw.ai) / [Moltbot](https://github.com/moltbot/moltbot)。
 
-**这是 [@william.qian/simple-wecom](https://www.npmjs.com/package/@william.qian/simple-wecom) 的修复版本**，解决了与最新版 Moltbot 的 API 兼容性问题。
+**基于 [@william.qian/simple-wecom](https://www.npmjs.com/package/@william.qian/simple-wecom)**，完全兼容 OpenClaw 2026.1.29+。
 
 ## ✨ 特性
 
+- ✅ **完整支持 OpenClaw 2026.1.29+**
 - ✅ 支持企业微信官方 API
-- ✅ 支持加密消息接收
+- ✅ 支持加密消息接收和发送
 - ✅ 支持文本、图片、文件等多种消息类型
 - ✅ 支持企业微信应用回调验证
-- ✅ 兼容最新版 Moltbot Plugin SDK
+- ✅ 使用最新 OpenClaw Plugin API
 
-## 🐛 修复内容
+## 🔄 版本历史
 
-### 问题
-原始插件 `@william.qian/simple-wecom` v1.0.2 存在 API 兼容性问题：
+### v1.3.0 (2026-01-30) - OpenClaw API 迁移
+- ✅ 完整迁移到 OpenClaw Plugin API
+- ✅ 重构 HTTP 路由为全局 webhook handler
+- ✅ 支持 OpenClaw 2026.1.29+
 
-```
-dispatchReplyWithBufferedBlockDispatcher is not a function
-```
-
-### 原因
-插件直接从 `clawdbot/plugin-sdk` 导入内部 API `dispatchReplyWithBufferedBlockDispatcher`，但该函数未在 plugin-sdk 中暴露。
-
-### 解决方案
-通过 `PluginRuntime` 访问内部 API：
-
-```typescript
-// 修改前（错误）
-await dispatchReplyWithBufferedBlockDispatcher({...})
-
-// 修改后（正确）
-const runtime = getSimpleWecomRuntime();
-await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({...})
-```
+### v1.1.0 (2026-01-29) - Clawdbot 兼容性修复
+- 🔧 修复了与 Clawdbot Plugin SDK 的 API 兼容性
+- 通过 `PluginRuntime` 访问内部 API
 
 详细改动请查看 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 📦 安装
 
-### 从 NPM 安装（推荐）
+### 方式 1：从 NPM 安装（推荐）
 
 ```bash
-moltbot plugins install @tobotorui/moltbot-wecom-channel
+# 使用 OpenClaw CLI
+openclaw plugins install @tobotorui/openclaw-wecom-channel
+
+# 或使用 npm
+npm install -g @tobotorui/openclaw-wecom-channel
 ```
 
-### 从 GitHub 安装
+### 方式 2：从 GitHub 安装
 
 ```bash
-moltbot plugins install https://github.com/toboto/moltbot-wecom-channel
+openclaw plugins install https://github.com/toboto/moltbot-wecom-channel
 ```
 
-### 手动安装
+### 方式 3：本地开发安装
 
 ```bash
 git clone https://github.com/toboto/moltbot-wecom-channel.git
 cd moltbot-wecom-channel
-npm install
-# 然后在 Moltbot 配置中添加插件路径
+openclaw plugins install . --link
 ```
 
 ## ⚙️ 配置
@@ -76,7 +67,7 @@ npm install
 
 在应用的「接收消息」设置中：
 
-1. **URL**: `http://your-gateway-host:port/simple-wecom/message`
+1. **URL**: `http://your-gateway-host:port/wecom/message`
 2. **Token**: 自定义（建议随机字符串）
 3. **EncodingAESKey**: 点击「随机生成」
 
@@ -86,12 +77,12 @@ npm install
 
 ### 4. 配置 Moltbot
 
-编辑 `~/.clawdbot/clawdbot.json`：
+编辑 `~/.openclaw/openclaw.json`：
 
 ```json
 {
   "channels": {
-    "simple-wecom": {
+    "wecom": {
       "enabled": true,
       "corpid": "你的企业ID",
       "corpsecret": "应用Secret",
@@ -102,7 +93,7 @@ npm install
   },
   "plugins": {
     "entries": {
-      "simple-wecom": {
+      "wecom": {
         "enabled": true
       }
     }
@@ -110,12 +101,15 @@ npm install
 }
 ```
 
-**⚠️ 重要：`agentid` 必须配置为数字类型，否则消息发送会失败。**
+**⚠️ 重要事项：**
+- `agentid` 必须配置为数字类型，否则消息发送会失败
+- Channel key 和 plugin ID 都是 `wecom`（不是 `simple-wecom`）
+- 配置文件位置：`~/.openclaw/openclaw.json`（不是 `~/.clawdbot/clawdbot.json`）
 
-### 5. 重启 Moltbot Gateway
+### 5. 重启 OpenClaw Gateway
 
 ```bash
-moltbot gateway restart
+openclaw gateway restart
 ```
 
 ## 🧪 测试
@@ -126,13 +120,23 @@ moltbot gateway restart
 
 查看日志：
 ```bash
-tail -f ~/.clawdbot/logs/clawdbot-$(date +%Y-%m-%d).log | grep -i wecom
+# OpenClaw 日志
+tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log | grep -i wecom
+
+# Gateway 日志（如果使用 nohup 启动）
+tail -f /tmp/openclaw-gateway.log | grep -i wecom
+```
+
+检查 channel 状态：
+```bash
+openclaw channels status
 ```
 
 常见问题：
-- **消息收不到**：检查回调 URL 配置和 IP 白名单
+- **消息收不到**：检查回调 URL 配置和企业微信 IP 白名单
 - **消息发不出去**：检查 `agentid`、`corpsecret` 配置和 IP 白名单
 - **签名验证失败**：检查 `token` 和 `encodingAESKey` 配置
+- **插件未加载**：运行 `openclaw plugins list` 检查插件状态
 
 ## 🔧 开发
 

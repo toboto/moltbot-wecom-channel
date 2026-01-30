@@ -1,15 +1,15 @@
 {
-  "name": "@tobotorui/moltbot-wecom-channel",
-  "version": "1.1.0",
+  "name": "@tobotorui/openclaw-wecom-channel",
+  "version": "1.3.0",
   "type": "module",
-  "description": "企业微信（WeCom）频道插件，用于 Moltbot (Clawdbot) - 修复版",
+  "description": "企业微信（WeCom）频道插件，用于 OpenClaw / Moltbot",
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
+    "openclaw",
     "moltbot",
-    "clawdbot",
     "wecom",
     "wechat",
     "enterprise",
@@ -33,16 +33,17 @@
   "publishConfig": {
     "access": "public"
   },
-  "clawdbot": {
+  "openclaw": {
     "extensions": [
       "./index.ts"
     ]
   },
   "dependencies": {
-    "fast-xml-parser": "^4.3.4"
+    "fast-xml-parser": "^4.3.4",
+    "zod": "^3.24.1"
   },
   "peerDependencies": {
-    "clawdbot": "*"
+    "openclaw": "*"
   },
   "engines": {
     "node": ">=18.0.0"

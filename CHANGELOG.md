@@ -2,6 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-01-30
+
+### 重大更新：完全支持 OpenClaw 2026.1.29+
+
+这是一个重大版本更新，将插件从 Clawdbot API 完全迁移到 OpenClaw API。
+
+### Changed
+
+- **完整的 API 迁移**
+  - SDK 导入：`clawdbot/plugin-sdk` → `openclaw/plugin-sdk`
+  - API 类型：`ClawdbotPluginApi` → `OpenClawPluginApi`
+  - 插件 ID：`simple-wecom` → `wecom`
+  - 包名称：`@tobotorui/moltbot-wecom-channel` → `@tobotorui/openclaw-wecom-channel`
+
+- **HTTP 路由架构重构**
+  - 移除了旧的 `runtime.channel.registerPluginHttpRoute()` API（已废弃）
+  - 创建新的 `src/webhook.ts` - 实现全局 HTTP webhook handler
+  - 在 `index.ts` 中通过 `api.registerHttpHandler()` 注册路由
+  - Handler 模式：检查 URL path，处理后返回 boolean
+
+- **Channel 插件简化**
+  - 移除 `src/gateway.ts` 中的 gateway 启动逻辑
+  - 简化 `src/channel.ts`，保留配置和 outbound 消息接口
+  - 更新所有函数名：`Simple*` → `Wecom*`
+
+### Added
+
+- ✅ 新增 `src/webhook.ts` - 统一的 HTTP webhook 处理器
+- ✅ 添加 `zod` 作为依赖（用于配置验证）
+- ✅ 添加 `openclaw.plugin.json` - OpenClaw 插件元数据
+
+### Fixed
+
+- ✅ 修复与 OpenClaw 2026.1.29+ 的完全兼容性
+- ✅ 修复 HTTP 路由注册机制
+- ✅ 修复配置加载和 channel 启动流程
+
+### Installation
+
+```bash
+# 从 NPM 安装
+npm install @tobotorui/openclaw-wecom-channel
+
+# 或使用 OpenClaw CLI
+openclaw plugins install @tobotorui/openclaw-wecom-channel
+```
+
+### Migration Guide
+
+如果您之前使用 `@tobotorui/moltbot-wecom-channel@1.2.0`：
+
+1. 卸载旧插件：`openclaw plugins uninstall moltbot-wecom-channel`
+2. 安装新插件：`openclaw plugins install @tobotorui/openclaw-wecom-channel`
+3. 配置中的 channel key 保持为 `wecom`（不需要更改）
+
+---
+
 ## [1.1.0] - 2026-01-29
 
 ### Fixed
