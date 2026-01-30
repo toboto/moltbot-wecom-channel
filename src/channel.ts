@@ -7,6 +7,7 @@ import {
 import { SimpleWecomConfigSchema, type SimpleWecomAccountConfigSchema } from "./config-schema.js";
 import { wecomClient } from "./client.js";
 import { getWecomRuntime } from "./runtime.js";
+import { wecomOnboardingAdapter } from "./onboarding.js";
 import type { z } from "zod";
 
 type WecomConfig = z.infer<typeof SimpleWecomConfigSchema>;
@@ -27,6 +28,7 @@ const meta = {
 export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
   id: "wecom",
   meta,
+  onboarding: wecomOnboardingAdapter,
   capabilities: {
     chatTypes: ["direct"],
     media: true,
