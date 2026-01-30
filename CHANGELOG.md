@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.2] - 2026-01-30
+
+### Added
+
+- **交互式配置支持（Onboarding）**：现在可以通过 `openclaw configure --section channels` 交互式配置 WeCom
+  - 创建了 `src/onboarding.ts` 实现 onboarding adapter
+  - 支持引导式输入所有必需配置字段：
+    - Corp ID (企业ID)
+    - Corp Secret (应用密钥)
+    - Agent ID (应用ID)
+    - Token (回调Token)
+    - EncodingAESKey (加密密钥)
+  - 包含输入验证和帮助文本
+  - 配置完成后显示后续步骤指引
+
+### Improved
+
+- 配置向导中不再显示 "wecom does not support onboarding yet."
+- 用户现在有两种配置方式：
+  1. 交互式配置（推荐）：`openclaw configure --section channels`
+  2. 手动编辑 JSON：`~/.openclaw/openclaw.json`
+
+---
+
 ## [1.3.1] - 2026-01-30
 
 ### Fixed
