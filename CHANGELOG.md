@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-01-30
+
+### Fixed
+
+- **配置向导错误修复**：修复了在运行 `openclaw configure --section channels` 时出现的 `TypeError: Cannot read properties of undefined (reading 'trim')` 错误
+  - 根本原因：meta 对象定义不完整，缺少 `label` 和 `selectionLabel` 等必需字段
+  - 解决方案：参考 Zalo 插件，手动定义完整的 meta 对象
+  - 添加了 `isConfigured()` 函数来正确验证配置
+  - 加强了 `describeAccount()` 和 `resolveAccount()` 的类型安全
+
+- **Meta 字段完整性**
+  - 添加 `label`: "WeCom"
+  - 添加 `selectionLabel`: "WeCom (Enterprise WeChat)"
+  - 添加 `docsPath`, `docsLabel`, `blurb`, `aliases`, `order`
+  - 现在配置向导中正确显示 channel 名称
+
+### Technical Details
+
+修复了 4 个主要问题：
+1. 添加 `isConfigured()` 函数检查必需配置字段
+2. 在 `describeAccount()` 中添加类型检查，防止对 undefined 调用 `.trim()`
+3. 移除 `getChatChannelMeta()` 调用（仅适用于核心 channels）
+4. 手动定义完整的 meta 对象（参考 Zalo 插件实现）
+
+---
+
 ## [1.3.0] - 2026-01-30
 
 ### 重大更新：完全支持 OpenClaw 2026.1.29+
