@@ -49,34 +49,43 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
 
         return {
             accountId: resolvedId,
-            name: account?.name || resolvedId,
+            name: String(account?.name || resolvedId),
             enabled: account?.enabled ?? simpleWecom?.enabled ?? true,
-            config: config,
+            config: config || {},
             tokenSource: "config",
-            token: config.token || "",
+            token: String(config?.token || ""),
         };
     },
     defaultAccountId: () => DEFAULT_ACCOUNT_ID,
     isConfigured: (account) => {
       // WeCom requires corpid, agentid, and token to be configured
-      const config = account.config as any;
+      const config = account?.config as any;
+      const corpid = config?.corpid;
+      const agentid = config?.agentid;
+      const token = config?.token;
+
       return Boolean(
-        config?.corpid?.trim() &&
-        config?.agentid &&
-        config?.token?.trim()
+        corpid && typeof corpid === 'string' && corpid.trim() &&
+        agentid &&
+        token && typeof token === 'string' && token.trim()
       );
     },
     describeAccount: (account) => {
-      const config = account.config as any;
+      const config = account?.config as any;
+      const corpid = config?.corpid;
+      const agentid = config?.agentid;
+      const token = config?.token;
+
       const isConfigured = Boolean(
-        config?.corpid?.trim() &&
-        config?.agentid &&
-        config?.token?.trim()
+        corpid && typeof corpid === 'string' && corpid.trim() &&
+        agentid &&
+        token && typeof token === 'string' && token.trim()
       );
+
       return {
-        accountId: account.accountId,
-        name: account.name,
-        enabled: account.enabled,
+        accountId: String(account?.accountId || DEFAULT_ACCOUNT_ID),
+        name: String(account?.name || DEFAULT_ACCOUNT_ID),
+        enabled: Boolean(account?.enabled ?? true),
         configured: isConfigured,
         tokenSource: "config",
       };
