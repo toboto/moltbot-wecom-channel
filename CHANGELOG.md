@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-01-31
+
+### Added
+
+- **语音转文字功能（Tencent Cloud ASR）**：支持将企业微信语音消息自动转写为文字
+  - 自动检测语音消息类型（`MsgType === "voice"`）
+  - 通过企业微信官方 API 下载语音文件（支持 AMR 格式）
+  - 集成腾讯云一句话识别 API (Sentence Recognition)
+  - 可选配置：未配置 ASR 时自动跳过识别
+  - 识别成功后自动将文字内容附加到消息中发送给 Agent
+  - 添加详细日志输出，便于调试语音处理流程
+  - 新增配置项：
+    - `tencentAsr.enabled` - 是否启用语音识别
+    - `tencentAsr.secretId` - 腾讯云 API 密钥 ID
+    - `tencentAsr.secretKey` - 腾讯云 API 密钥
+    - `tencentAsr.region` - 服务地域（默认：`ap-guangzhou`）
+    - `tencentAsr.engineModelType` - 引擎模型（默认：`16k_zh`）
+
+### Fixed
+
+- 修复重复导入问题（`tmpdir` 和 `writeFile` 重复声明）
+- 移除 `configSchema` 字段以避免 Zod schema 循环引用导致的 `Maximum call stack size exceeded` 错误
+- 修正包名从 `@tobotorui/openclaw-wecom-channel` 到 `@tobotorui/wecom`，消除插件 ID 不匹配警告
+
+### Technical Details
+
+新增文件：
+- `src/tencent-asr.ts` - 腾讯云语音识别 API 客户端实现
+- `src/official-api.ts` - 新增 `downloadMedia()` 方法用于下载语音文件
+
+修改文件：
+- `src/webhook.ts` - 集成语音消息检测和 ASR 处理流程
+- `src/config-schema.ts` - 添加 `tencentAsr` 配置选项
+- `src/channel.ts` - 移除冗余的 `configSchema` 字段
+- `package.json` - 更新包名和版本号
+
+---
+
 ## [1.3.2] - 2026-01-30
 
 ### Added
