@@ -9,6 +9,10 @@ import { verifySignature, decryptMessage, calculateSignature } from "./crypto.js
 import { parseWeComMessage, formatMessageForClawdbot } from "./message-parser.js";
 import { XMLParser } from "fast-xml-parser";
 import { parseMultipart } from "./multipart.js";
+import { wecomOfficialAPI } from "./official-api.js";
+import { recognizeVoice } from "./tencent-asr.js";
+import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -214,8 +218,67 @@ async function handleEncryptedWeComMessage(
   console.log("=== Parsed WeChat Message ===");
   console.log(JSON.stringify(wecomMessage, null, 2));
 
+  // 6.5. Process voice message with ASR if configured
+  let voiceTranscript: string | undefined;
+  if (wecomMessage.MsgType === "voice") {
+    console.log("[Voice] 检测到语音消息");
+    console.log(`[Voice] MediaId: ${wecomMessage.MediaId}`);
+    console.log(`[Voice] Format: ${wecomMessage.Format}`);
+
+    const asrConfig = config.tencentAsr;
+    if (asrConfig?.enabled && asrConfig.secretId && asrConfig.secretKey) {
+      console.log("[Voice] 腾讯云 ASR 已启用，开始语音识别...");
+
+      try {
+        // Download voice file
+        const voiceBuffer = await wecomOfficialAPI.downloadMedia(
+          config.corpid,
+          config.corpsecret,
+          wecomMessage.MediaId
+        );
+
+        // Save to temp file
+        const tempFilePath = join(
+          tmpdir(),
+          `wecom-voice-${Date.now()}-${wecomMessage.MediaId}.${wecomMessage.Format || "amr"}`
+        );
+        await writeFile(tempFilePath, voiceBuffer);
+        console.log(`[Voice] ✓ 语音文件已保存: ${tempFilePath}`);
+
+        // Recognize voice
+        const asrResult = await recognizeVoice(tempFilePath, {
+          secretId: asrConfig.secretId,
+          secretKey: asrConfig.secretKey,
+          region: asrConfig.region,
+          engineModelType: asrConfig.engineModelType,
+        });
+
+        if (asrResult.success && asrResult.text) {
+          voiceTranscript = asrResult.text;
+          console.log(`[Voice] ✓ 语音识别成功: ${voiceTranscript}`);
+        } else {
+          console.warn(`[Voice] ✗ 语音识别失败: ${asrResult.error}`);
+        }
+
+        // Clean up temp file (optional, OS will clean tmpdir eventually)
+        // await unlink(tempFilePath).catch(() => {});
+      } catch (error) {
+        console.error("[Voice] 语音处理失败:", error);
+      }
+    } else {
+      console.log("[Voice] ASR 未配置或未启用，跳过语音识别");
+    }
+  }
+
   // 7. Convert to Clawdbot format
-  const { text, mediaUrls } = formatMessageForClawdbot(wecomMessage);
+  let { text, mediaUrls } = formatMessageForClawdbot(wecomMessage);
+
+  // 7.5. Append voice transcript if available
+  if (voiceTranscript) {
+    text = `[语音内容]\n${voiceTranscript}`;
+    console.log("[Voice] ✓ 已将语音识别结果添加到消息中");
+  }
+
   const userId = wecomMessage.FromUserName;
 
   console.log("=== WeCom Context to Agent ===");
