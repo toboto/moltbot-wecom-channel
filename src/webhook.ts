@@ -11,8 +11,6 @@ import { XMLParser } from "fast-xml-parser";
 import { parseMultipart } from "./multipart.js";
 import { wecomOfficialAPI } from "./official-api.js";
 import { recognizeVoice } from "./tencent-asr.js";
-import { tmpdir } from "node:os";
-import { writeFile } from "node:fs/promises";
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
