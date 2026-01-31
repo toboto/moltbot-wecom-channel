@@ -22,6 +22,15 @@ export const SimpleWecomAccountConfigSchema = z.object({
 
   // 自定义系统提示词
   systemPrompt: z.string().optional().describe("自定义系统提示词片段"),
+
+  // 腾讯云 ASR 语音识别配置（可选）
+  tencentAsr: z.object({
+    enabled: z.boolean().optional().describe("是否启用腾讯云语音识别"),
+    secretId: z.string().optional().describe("腾讯云 SecretId"),
+    secretKey: z.string().optional().describe("腾讯云 SecretKey"),
+    region: z.string().optional().default("ap-guangzhou").describe("腾讯云地域，默认广州"),
+    engineModelType: z.string().optional().default("16k_zh").describe("引擎模型类型，默认 16k_zh 中文普通话"),
+  }).optional().describe("腾讯云语音识别配置"),
 }).strict();
 
 export const SimpleWecomConfigSchema = SimpleWecomAccountConfigSchema.extend({

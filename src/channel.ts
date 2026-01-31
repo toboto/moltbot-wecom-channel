@@ -35,7 +35,6 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
     text: true,
     blockStreaming: true,
   },
-  configSchema: buildChannelConfigSchema(SimpleWecomConfigSchema),
   config: {
     listAccountIds: (cfg) => {
         const accounts = cfg.channels?.["wecom"]?.accounts;

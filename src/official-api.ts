@@ -179,6 +179,54 @@ export class WeComOfficialAPI {
 
     return result;
   }
+
+  /**
+   * 下载临时素材
+   * @param corpid 企业ID
+   * @param corpsecret 应用Secret
+   * @param mediaId 媒体文件ID
+   * @returns 文件 Buffer
+   */
+  async downloadMedia(
+    corpid: string,
+    corpsecret: string,
+    mediaId: string
+  ): Promise<Buffer> {
+    const accessToken = await accessTokenManager.getAccessToken(
+      corpid,
+      corpsecret
+    );
+
+    const url = `https://qyapi.weixin.qq.com/cgi-bin/media/get?access_token=${encodeURIComponent(
+      accessToken
+    )}&media_id=${encodeURIComponent(mediaId)}`;
+
+    console.log(`[Media] 下载媒体文件: ${mediaId}`);
+    console.log(`[Media] URL: ${url.substring(0, 100)}...`);
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Download media failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    // 检查是否返回 JSON 错误
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const result = await response.json();
+      if (result.errcode && result.errcode !== 0) {
+        throw new Error(
+          `WeChat download error: ${result.errcode} - ${result.errmsg}`
+        );
+      }
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    console.log(`[Media] ✓ 下载成功，大小: ${buffer.length} bytes`);
+    return buffer;
+  }
 }
 
 export const wecomOfficialAPI = new WeComOfficialAPI();
