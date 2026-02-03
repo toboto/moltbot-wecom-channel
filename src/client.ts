@@ -1,4 +1,6 @@
 import type { ServerResponse } from "node:http";
+import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
 import { wecomOfficialAPI } from "./official-api.js";
 
 export interface SimpleWecomMessage {
@@ -11,6 +13,58 @@ export class SimpleWecomClient {
   private pendingRequests = new Map<string, ServerResponse>();
 
   constructor() {}
+
+  /**
+   * 从 URL 或本地文件路径获取文件内容
+   */
+  private async fetchMediaFile(mediaUrl: string): Promise<Buffer> {
+    // 如果是本地文件路径（以 / 开头或包含盘符）
+    if (mediaUrl.startsWith("/") || /^[A-Za-z]:/.test(mediaUrl)) {
+      console.log(`[WeCom] 读取本地文件: ${mediaUrl}`);
+      return await readFile(mediaUrl);
+    }
+
+    // 如果是 HTTP/HTTPS URL
+    if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+      console.log(`[WeCom] 下载远程文件: ${mediaUrl}`);
+      const response = await fetch(mediaUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch media: ${response.status} ${response.statusText}`);
+      }
+      return Buffer.from(await response.arrayBuffer());
+    }
+
+    throw new Error(`Unsupported media URL format: ${mediaUrl}`);
+  }
+
+  /**
+   * 根据文件路径/URL 检测媒体类型
+   */
+  private detectMediaType(mediaUrl: string): {
+    type: "image" | "voice" | "video" | "file";
+    filename: string;
+  } {
+    const ext = extname(mediaUrl).toLowerCase();
+    const filename = mediaUrl.split("/").pop() || "file" + ext;
+
+    // 图片类型
+    if ([".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"].includes(ext)) {
+      return { type: "image", filename };
+    }
+
+    // 音频类型
+    if ([".mp3", ".wav", ".amr", ".ogg", ".m4a"].includes(ext)) {
+      return { type: "voice", filename };
+    }
+
+    // 视频类型
+    if ([".mp4", ".avi", ".mov", ".wmv", ".flv", ".mkv"].includes(ext)) {
+      return { type: "video", filename };
+    }
+
+    // 默认为文件
+    return { type: "file", filename };
+  }
 
   // Called by Gateway when Sync=true
   registerPendingRequest(userId: string, res: ServerResponse, timeoutMs: number = 30000) {
@@ -77,14 +131,73 @@ export class SimpleWecomClient {
     // 2. 企业微信官方 API（优先）
     if (config.corpid && config.corpsecret && config.agentid) {
       try {
-        let finalText = message.text || "";
-
-        // 处理文件附件（如果有）
+        // 如果有媒体文件，先上传获取 media_id，然后发送图片消息
         if (message.mediaUrl) {
-          finalText = finalText
-            ? `${finalText}\n\n📎 附件: ${message.mediaUrl}`
-            : `📎 附件: ${message.mediaUrl}`;
+          try {
+            // 1. 下载/读取文件内容
+            const fileBuffer = await this.fetchMediaFile(message.mediaUrl);
+
+            // 2. 确定文件类型和文件名
+            const { type, filename } = this.detectMediaType(message.mediaUrl);
+
+            // 3. 上传到企业微信获取 media_id
+            console.log(`[WeCom] 上传媒体文件: ${filename} (${type})`);
+            const uploadResult = await wecomOfficialAPI.uploadMedia(
+              config.corpid,
+              config.corpsecret,
+              type,
+              fileBuffer,
+              filename
+            );
+
+            console.log(`[WeCom] ✓ 上传成功，media_id: ${uploadResult.media_id}`);
+
+            // 4. 发送图片消息
+            const imagePayload = {
+              msgtype: "image" as const,
+              agentid: config.agentid,
+              touser: userId,
+              image: {
+                media_id: uploadResult.media_id,
+              },
+            };
+
+            const imageResult = await wecomOfficialAPI.sendMessage(
+              config.corpid,
+              config.corpsecret,
+              imagePayload
+            );
+
+            console.log("企业微信图片消息发送成功:", imageResult);
+
+            // 如果有附带文本，再发送一条文本消息
+            if (message.text) {
+              const textPayload = {
+                msgtype: "text" as const,
+                agentid: config.agentid,
+                touser: userId,
+                text: {
+                  content: message.text,
+                },
+              };
+
+              await wecomOfficialAPI.sendMessage(
+                config.corpid,
+                config.corpsecret,
+                textPayload
+              );
+            }
+
+            return; // Delivered
+          } catch (uploadError) {
+            console.error("企业微信媒体上传失败:", uploadError);
+            // 降级：发送文本消息包含文件链接
+            console.log("[WeCom] 降级为文本消息（包含文件链接）");
+          }
         }
+
+        // 发送纯文本消息
+        const finalText = message.text || "";
 
         // 构造消息payload
         const payload = {

@@ -1,17 +1,16 @@
 import {
   buildChannelConfigSchema,
   type ChannelPlugin,
-  type ResolvedChannelAccount,
   DEFAULT_ACCOUNT_ID
 } from "openclaw/plugin-sdk";
-import { SimpleWecomConfigSchema, type SimpleWecomAccountConfigSchema } from "./config-schema.js";
+import { SimpleWecomConfigSchema } from "./config-schema.js";
 import { wecomClient } from "./client.js";
 import { getWecomRuntime } from "./runtime.js";
 import { wecomOnboardingAdapter } from "./onboarding.js";
+import type { ResolvedWecomAccount } from "./types.js";
 import type { z } from "zod";
 
 type WecomConfig = z.infer<typeof SimpleWecomConfigSchema>;
-type ResolvedWecomAccount = ResolvedChannelAccount<WecomConfig>;
 
 const meta = {
   id: "wecom",
