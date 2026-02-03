@@ -313,9 +313,22 @@ async function handleEncryptedWeComMessage(
         console.log("MediaUrl:", payload.mediaUrl);
         console.log("================================");
 
+        // 自动检测文本中的文件路径（如果 mediaUrl 未设置）
+        let mediaUrl = payload.mediaUrl;
+        if (!mediaUrl && payload.text) {
+          // 匹配文件路径模式：/path/to/file.ext 或 ~/path/to/file.ext
+          const filePathRegex = /(?:^|[^`])([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|mp4|mp3|wav|pdf|zip|tar|gz))/gi;
+          const matches = payload.text.match(filePathRegex);
+          if (matches && matches.length > 0) {
+            // 提取第一个文件路径
+            mediaUrl = matches[0].trim().replace(/^[^/~]*([/~])/, '$1');
+            console.log(`[WeCom] 自动检测到文件路径: ${mediaUrl}`);
+          }
+        }
+
         const msg: SimpleWecomMessage = {
           text: payload.text,
-          mediaUrl: payload.mediaUrl
+          mediaUrl: mediaUrl
         };
 
         await wecomClient.sendMessage(userId, msg, {
@@ -452,9 +465,22 @@ async function handleLegacyMessage(
         console.log("MediaUrl:", payload.mediaUrl);
         console.log("================================");
 
+        // 自动检测文本中的文件路径（如果 mediaUrl 未设置）
+        let mediaUrl = payload.mediaUrl;
+        if (!mediaUrl && payload.text) {
+          // 匹配文件路径模式：/path/to/file.ext 或 ~/path/to/file.ext
+          const filePathRegex = /(?:^|[^`])([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|mp4|mp3|wav|pdf|zip|tar|gz))/gi;
+          const matches = payload.text.match(filePathRegex);
+          if (matches && matches.length > 0) {
+            // 提取第一个文件路径
+            mediaUrl = matches[0].trim().replace(/^[^/~]*([/~])/, '$1');
+            console.log(`[WeCom] 自动检测到文件路径: ${mediaUrl}`);
+          }
+        }
+
         const msg: SimpleWecomMessage = {
           text: payload.text,
-          mediaUrl: payload.mediaUrl
+          mediaUrl: mediaUrl
         };
 
         await wecomClient.sendMessage(email!, msg, {
