@@ -317,11 +317,12 @@ async function handleEncryptedWeComMessage(
         let mediaUrl = payload.mediaUrl;
         if (!mediaUrl && payload.text) {
           // 匹配文件路径模式：/path/to/file.ext 或 ~/path/to/file.ext
-          const filePathRegex = /(?:^|[^`])([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|mp4|mp3|wav|pdf|zip|tar|gz))/gi;
-          const matches = payload.text.match(filePathRegex);
+          // 支持反引号、引号包裹的路径，以及裸路径
+          const filePathRegex = /[`'"]?([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr|pdf|zip|tar|gz))[`'"]?/gi;
+          const matches = [...payload.text.matchAll(filePathRegex)];
           if (matches && matches.length > 0) {
-            // 提取第一个文件路径
-            mediaUrl = matches[0].trim().replace(/^[^/~]*([/~])/, '$1');
+            // 提取第一个匹配的文件路径（group 1）
+            mediaUrl = matches[0][1];
             console.log(`[WeCom] 自动检测到文件路径: ${mediaUrl}`);
           }
         }
@@ -469,11 +470,12 @@ async function handleLegacyMessage(
         let mediaUrl = payload.mediaUrl;
         if (!mediaUrl && payload.text) {
           // 匹配文件路径模式：/path/to/file.ext 或 ~/path/to/file.ext
-          const filePathRegex = /(?:^|[^`])([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|mp4|mp3|wav|pdf|zip|tar|gz))/gi;
-          const matches = payload.text.match(filePathRegex);
+          // 支持反引号、引号包裹的路径，以及裸路径
+          const filePathRegex = /[`'"]?([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr|pdf|zip|tar|gz))[`'"]?/gi;
+          const matches = [...payload.text.matchAll(filePathRegex)];
           if (matches && matches.length > 0) {
-            // 提取第一个文件路径
-            mediaUrl = matches[0].trim().replace(/^[^/~]*([/~])/, '$1');
+            // 提取第一个匹配的文件路径（group 1）
+            mediaUrl = matches[0][1];
             console.log(`[WeCom] 自动检测到文件路径: ${mediaUrl}`);
           }
         }
