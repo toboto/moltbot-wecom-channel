@@ -113,6 +113,8 @@ export class SimpleWecomClient {
     token?: string,
     encodingAESKey?: string
   }) {
+    console.log(`[WeCom Client] sendMessage called - userId: ${userId}, text: ${message.text?.substring(0, 50)}..., mediaUrl: ${message.mediaUrl}`);
+
     // 1. Check Sync
     const pendingRes = this.pendingRequests.get(userId);
     if (pendingRes && !pendingRes.writableEnded) {
@@ -130,9 +132,11 @@ export class SimpleWecomClient {
 
     // 2. 企业微信官方 API（优先）
     if (config.corpid && config.corpsecret && config.agentid) {
+      console.log("[WeCom Client] 使用官方 API 路径 (corpid + corpsecret + agentid)");
       try {
         // 如果有媒体文件，先上传获取 media_id，然后发送图片消息
         if (message.mediaUrl) {
+          console.log(`[WeCom Client] 检测到 mediaUrl，开始媒体上传流程: ${message.mediaUrl}`);
           try {
             // 1. 下载/读取文件内容
             const fileBuffer = await this.fetchMediaFile(message.mediaUrl);
@@ -225,6 +229,7 @@ export class SimpleWecomClient {
 
     // 3. 企业微信封装 API（向后兼容）
     if (config.weworkApiUrl && config.weworkToken && config.weworkCode) {
+      console.log("[WeCom Client] 使用封装 API 路径 (weworkApiUrl + weworkToken + weworkCode)");
       try {
         const apiUrl = config.weworkApiUrl || "https://galaxy.ucloudadmin.com/";
         const namespace = config.weworkNamespace || "企业智瞰";

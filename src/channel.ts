@@ -100,6 +100,7 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
   outbound: {
     deliveryMode: "direct",
     sendText: async ({ to, text, accountId }) => {
+        console.log(`[WeCom Channel] sendText called - to: ${to}, text: ${text?.substring(0, 50)}...`);
         const runtime = getWecomRuntime();
         const cfg = await runtime.config.loadConfig();
         const wecom = cfg.channels?.["wecom"];
@@ -126,6 +127,7 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
         return { channel: "wecom", ok: true };
     },
     sendMedia: async ({ to, text, mediaUrl, accountId }) => {
+        console.log(`[WeCom Channel] sendMedia called - to: ${to}, text: ${text?.substring(0, 50)}..., mediaUrl: ${mediaUrl}`);
         const runtime = getWecomRuntime();
         const cfg = await runtime.config.loadConfig();
         const wecom = cfg.channels?.["wecom"];
