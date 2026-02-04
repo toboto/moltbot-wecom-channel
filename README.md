@@ -54,7 +54,45 @@ openclaw plugins install . --link
 
 ## 🎯 推荐安装配套 Skill
 
-为了更好地在企业微信中使用定时提醒功能，强烈推荐安装 `wecom-reminder` skill：
+为了更好地使用企业微信频道，强烈推荐安装以下 skills：
+
+### 1. file-attachment skill（文件附件处理）⭐ 必装
+
+**确保 Agent 生成的文件（截图、图片、PDF等）能够正确发送到企业微信。**
+
+```bash
+# 方式 1: 从本仓库安装（需先克隆仓库）
+cp -r skills/file-attachment ~/.openclaw/skills/
+
+# 方式 2: 直接从 GitHub 安装
+git clone https://github.com/toboto/moltbot-wecom-channel.git /tmp/wecom-plugin
+cp -r /tmp/wecom-plugin/skills/file-attachment ~/.openclaw/skills/
+rm -rf /tmp/wecom-plugin
+```
+
+**file-attachment skill 的功能：**
+
+- ✅ 指导 Agent 在发送文件时包含完整文件路径
+- ✅ 支持截图、生成图片、PDF、音视频等所有文件类型
+- ✅ 自动触发，无需用户手动指定
+- ✅ 确保文件在所有消息渠道中正确送达
+
+**使用效果：**
+
+在企业微信中说：
+```
+"截个图给我"
+"画一张猫的图片"
+"把这个网页转成PDF"
+```
+
+Agent 会自动在回复中包含文件路径（如 `![截图](/path/to/screenshot.png)`），插件会自动上传并发送文件。
+
+---
+
+### 2. wecom-reminder skill（定时提醒）
+
+**使用自然语言创建企业微信定时提醒。**
 
 ```bash
 # 方式 1: 从本仓库安装（需先克隆仓库）
@@ -83,7 +121,9 @@ rm -rf /tmp/wecom-plugin
 
 OpenClaw 会自动使用正确的配置创建定时任务，确保消息准时送达。
 
-详细使用说明请查看 skill 内的文档。
+---
+
+详细使用说明请查看各 skill 内的文档。
 
 ## ⚙️ 配置
 

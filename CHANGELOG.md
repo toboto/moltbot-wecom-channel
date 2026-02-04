@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-02-04
+
+### Added
+
+- **事件消息类型支持**：添加 `WeComEventMessage` 接口，支持企业微信事件消息（如 `enter_agent`、`LOCATION` 等）
+- **file-attachment skill**：新增文件附件处理 skill，确保 Agent 生成的文件能够正确发送
+  - 指导 Agent 在发送文件时包含完整路径
+  - 支持截图、图片、PDF、音视频等所有文件类型
+  - 自动触发，适用于所有消息渠道
+- **会话上下文跟踪**：新增 `src/session-context.ts`，使用 AsyncLocalStorage 跟踪请求级别的用户上下文
+
+### Fixed
+
+- **修复事件消息报错**：企业微信发送事件通知（进入应用、地理位置上报等）时不再报 `Unsupported message type: event` 错误
+- **修复 @all 收件人问题**：通过 AsyncLocalStorage 正确解析收件人，避免文件发送给所有人
+- **移除多用户冲突隐患**：完全移除 `lastRecipient` 全局状态，防止并发场景下的跨用户消息污染
+
+### Technical Details
+
+新增文件：
+- `src/session-context.ts` - AsyncLocalStorage 会话上下文管理
+- `skills/file-attachment/SKILL.md` - 文件附件处理 skill
+
+修改文件：
+- `src/message-parser.ts` - 添加 `WeComEventMessage` 类型和解析逻辑
+- `src/webhook.ts` - 跳过事件消息处理，移除 lastRecipient 引用
+- `src/channel.ts` - 使用 AsyncLocalStorage 解析 @all 收件人，移除 lastRecipient fallback
+- `src/client.ts` - 移除 lastRecipient 跟踪
+- `src/gateway.ts` - 移除 lastRecipient 设置
+- `README.md` - 添加 file-attachment skill 安装指南
+
+---
+
 ## [1.4.0] - 2026-01-31
 
 ### Added
