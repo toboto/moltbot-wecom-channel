@@ -9,6 +9,7 @@ import { getWecomRuntime } from "./runtime.js";
 import { wecomOnboardingAdapter } from "./onboarding.js";
 import type { ResolvedWecomAccount } from "./types.js";
 import type { z } from "zod";
+import { getCurrentUserId } from "./session-context.js";
 
 type WecomConfig = z.infer<typeof SimpleWecomConfigSchema>;
 
@@ -101,6 +102,38 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
     deliveryMode: "direct",
     sendText: async ({ to, text, accountId }) => {
         console.log(`[WeCom Channel] sendText called - to: ${to}, text: ${text?.substring(0, 50)}...`);
+
+        // 🔧 Fix recipient when OpenClaw sends @all
+        let recipient = to;
+        if (to === "@all") {
+            // Try AsyncLocalStorage first
+            let currentUserId = getCurrentUserId();
+
+            // Fallback to last known recipient
+            if (!currentUserId && wecomClient.lastRecipient) {
+                currentUserId = wecomClient.lastRecipient;
+                console.log(`[WeCom Channel] 🔧 使用最后收件人: ${currentUserId}`);
+            }
+
+            if (currentUserId) {
+                recipient = currentUserId;
+                console.log(`[WeCom Channel] ✅ 修正收件人: @all → ${recipient}`);
+            } else {
+                console.warn(`[WeCom Channel] ⚠️  无法解析收件人，保持 @all (可能发给所有人)`);
+            }
+        }
+
+        // 🔍 检测 markdown 图片语法并提取媒体 URL
+        let mediaUrl: string | undefined;
+        if (text) {
+            const markdownImageRegex = /!\[.*?\]\(([/~][^\s)]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr))\)/gi;
+            const markdownMatches = [...text.matchAll(markdownImageRegex)];
+            if (markdownMatches && markdownMatches.length > 0) {
+                mediaUrl = markdownMatches[0][1];
+                console.log(`[WeCom Channel] 🖼️ 检测到 Markdown 图片: ${mediaUrl}`);
+            }
+        }
+
         const runtime = getWecomRuntime();
         const cfg = await runtime.config.loadConfig();
         const wecom = cfg.channels?.["wecom"];
@@ -110,7 +143,7 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
         if (defaults.accounts) delete defaults.accounts;
         const config = { ...defaults, ...account } as any;
 
-        await wecomClient.sendMessage(to, { text }, {
+        await wecomClient.sendMessage(recipient, { text, mediaUrl }, {
             webhookUrl: config.webhookUrl,
             webhookToken: config.webhookToken,
             weworkApiUrl: config.weworkApiUrl,
@@ -127,7 +160,36 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
         return { channel: "wecom", ok: true };
     },
     sendMedia: async ({ to, text, mediaUrl, accountId }) => {
-        console.log(`[WeCom Channel] sendMedia called - to: ${to}, text: ${text?.substring(0, 50)}..., mediaUrl: ${mediaUrl}`);
+        console.log(`\n${"=".repeat(80)}`);
+        console.log(`🎯🎯🎯 [WeCom Channel] ⚡ sendMedia DIRECTLY CALLED ⚡ 🎯🎯🎯`);
+        console.log(`${"=".repeat(80)}`);
+        console.log(`[sendMedia Params]`);
+        console.log(`  to: ${to}`);
+        console.log(`  text: ${text?.substring(0, 100)}...`);
+        console.log(`  mediaUrl: ${mediaUrl}`);
+        console.log(`  accountId: ${accountId}`);
+        console.log(`${"=".repeat(80)}\n`);
+
+        // 🔧 Fix recipient when OpenClaw sends @all
+        let recipient = to;
+        if (to === "@all") {
+            // Try AsyncLocalStorage first
+            let currentUserId = getCurrentUserId();
+
+            // Fallback to last known recipient
+            if (!currentUserId && wecomClient.lastRecipient) {
+                currentUserId = wecomClient.lastRecipient;
+                console.log(`[WeCom Channel] 🔧 使用最后收件人: ${currentUserId}`);
+            }
+
+            if (currentUserId) {
+                recipient = currentUserId;
+                console.log(`[WeCom Channel] ✅ 修正收件人: @all → ${recipient}`);
+            } else {
+                console.warn(`[WeCom Channel] ⚠️  无法解析收件人，保持 @all (可能发给所有人)`);
+            }
+        }
+
         const runtime = getWecomRuntime();
         const cfg = await runtime.config.loadConfig();
         const wecom = cfg.channels?.["wecom"];
@@ -137,7 +199,7 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
         if (defaults.accounts) delete defaults.accounts;
         const config = { ...defaults, ...account } as any;
 
-        await wecomClient.sendMessage(to, { text, mediaUrl }, {
+        await wecomClient.sendMessage(recipient, { text, mediaUrl }, {
             webhookUrl: config.webhookUrl,
             webhookToken: config.webhookToken,
             weworkApiUrl: config.weworkApiUrl,

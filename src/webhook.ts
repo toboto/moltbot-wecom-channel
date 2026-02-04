@@ -11,6 +11,7 @@ import { XMLParser } from "fast-xml-parser";
 import { parseMultipart } from "./multipart.js";
 import { wecomOfficialAPI } from "./official-api.js";
 import { recognizeVoice } from "./tencent-asr.js";
+import { runInSessionContext } from "./session-context.js";
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -216,6 +217,15 @@ async function handleEncryptedWeComMessage(
   console.log("=== Parsed WeChat Message ===");
   console.log(JSON.stringify(wecomMessage, null, 2));
 
+  // 6.1. Skip event messages (enter_agent, LOCATION, etc.)
+  if (wecomMessage.MsgType === "event") {
+    console.log(`[WeCom] 跳过事件消息: ${(wecomMessage as any).Event}`);
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/plain");
+    res.end("success");
+    return;
+  }
+
   // 6.5. Process voice message with ASR if configured
   let voiceTranscript: string | undefined;
   if (wecomMessage.MsgType === "voice") {
@@ -279,6 +289,10 @@ async function handleEncryptedWeComMessage(
 
   const userId = wecomMessage.FromUserName;
 
+  // 🔧 Set lastRecipient EARLY - before any dispatch
+  wecomClient.lastRecipient = userId;
+  console.log(`[WeCom Webhook] 📝 预设最后收件人: ${userId}`);
+
   console.log("=== WeCom Context to Agent ===");
   console.log("From:", userId);
   console.log("Body:", text);
@@ -293,9 +307,10 @@ async function handleEncryptedWeComMessage(
   // 9. Process message asynchronously
   const systemPrompt = config.systemPrompt?.trim() || undefined;
 
-  // Dispatch
+  // Dispatch within session context
   const runtime = getWecomRuntime();
-  await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+  await runInSessionContext(userId, accountId, async () => {
+    await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
     ctx: {
       From: userId,
       Body: text,
@@ -309,23 +324,32 @@ async function handleEncryptedWeComMessage(
       responsePrefix: "",
       deliver: async (payload) => {
         console.log("=== WeCom Deliver Payload ===");
-        console.log("Text:", payload.text);
+        console.log("Text:", payload.text?.substring(0, 100));
         console.log("MediaUrl:", payload.mediaUrl);
-        console.log("================================");
 
-        // 自动检测文本中的文件路径（如果 mediaUrl 未设置）
+        // 🔍 自动检测文件路径（如果 mediaUrl 未设置）
         let mediaUrl = payload.mediaUrl;
         if (!mediaUrl && payload.text) {
-          // 匹配文件路径模式：/path/to/file.ext 或 ~/path/to/file.ext
-          // 支持反引号、引号包裹的路径，以及裸路径
-          const filePathRegex = /[`'"]?([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr|pdf|zip|tar|gz))[`'"]?/gi;
-          const matches = [...payload.text.matchAll(filePathRegex)];
-          if (matches && matches.length > 0) {
-            // 提取第一个匹配的文件路径（group 1）
-            mediaUrl = matches[0][1];
-            console.log(`[WeCom] 自动检测到文件路径: ${mediaUrl}`);
+          // 1. 匹配 markdown 图片语法: ![alt](path)
+          const markdownImageRegex = /!\[.*?\]\(([/~][^\s)]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr))\)/gi;
+          const markdownMatches = [...payload.text.matchAll(markdownImageRegex)];
+
+          if (markdownMatches && markdownMatches.length > 0) {
+            mediaUrl = markdownMatches[0][1];
+            console.log(`[Auto-detect] ✅ 检测到 Markdown 图片: ${mediaUrl}`);
+          } else {
+            // 2. 匹配文件路径模式 (支持反引号、引号包裹的路径)
+            const filePathRegex = /[`'"]?([/~][^\s`'"<>]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr|pdf))[`'"]?/gi;
+            const matches = [...payload.text.matchAll(filePathRegex)];
+
+            if (matches && matches.length > 0) {
+              mediaUrl = matches[0][1];
+              console.log(`[Auto-detect] ✅ 检测到文件路径: ${mediaUrl}`);
+            }
           }
         }
+
+        console.log("MediaUrl (final):", mediaUrl);
 
         const msg: SimpleWecomMessage = {
           text: payload.text,
@@ -352,6 +376,7 @@ async function handleEncryptedWeComMessage(
     },
     replyOptions: {},
   });
+  }); // End runInSessionContext
 }
 
 /**
@@ -436,6 +461,9 @@ async function handleLegacyMessage(
     }
   }
 
+  // 🔧 Add hidden instruction for recipient targeting
+  enrichedText = `${enrichedText}\n\n[系统提示：如果需要发送媒体文件（图片/视频/音频等），接收者ID为: ${email}]`;
+
   console.log("=== WeCom Context to Agent ===");
   console.log("From:", email);
   console.log("Body:", enrichedText);
@@ -446,9 +474,10 @@ async function handleLegacyMessage(
   // Read systemPrompt from config
   const systemPrompt = config.systemPrompt?.trim() || undefined;
 
-  // Dispatch
+  // Dispatch within session context
   const runtime = getWecomRuntime();
-  await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+  await runInSessionContext(email!, accountId, async () => {
+    await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
     ctx: {
       From: email,
       Body: enrichedText,
@@ -466,23 +495,9 @@ async function handleLegacyMessage(
         console.log("MediaUrl:", payload.mediaUrl);
         console.log("================================");
 
-        // 自动检测文本中的文件路径（如果 mediaUrl 未设置）
-        let mediaUrl = payload.mediaUrl;
-        if (!mediaUrl && payload.text) {
-          // 匹配文件路径模式：/path/to/file.ext 或 ~/path/to/file.ext
-          // 支持反引号、引号包裹的路径，以及裸路径
-          const filePathRegex = /[`'"]?([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr|pdf|zip|tar|gz))[`'"]?/gi;
-          const matches = [...payload.text.matchAll(filePathRegex)];
-          if (matches && matches.length > 0) {
-            // 提取第一个匹配的文件路径（group 1）
-            mediaUrl = matches[0][1];
-            console.log(`[WeCom] 自动检测到文件路径: ${mediaUrl}`);
-          }
-        }
-
         const msg: SimpleWecomMessage = {
           text: payload.text,
-          mediaUrl: mediaUrl
+          mediaUrl: payload.mediaUrl
         };
 
         await wecomClient.sendMessage(email!, msg, {
@@ -505,4 +520,5 @@ async function handleLegacyMessage(
     },
     replyOptions: {},
   });
+  }); // End runInSessionContext
 }

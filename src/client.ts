@@ -12,6 +12,9 @@ export class SimpleWecomClient {
   private outboundQueue = new Map<string, SimpleWecomMessage[]>();
   private pendingRequests = new Map<string, ServerResponse>();
 
+  // 🔧 Track last recipient for @all fallback
+  public lastRecipient: string | null = null;
+
   constructor() {}
 
   /**
@@ -114,6 +117,12 @@ export class SimpleWecomClient {
     encodingAESKey?: string
   }) {
     console.log(`[WeCom Client] sendMessage called - userId: ${userId}, text: ${message.text?.substring(0, 50)}..., mediaUrl: ${message.mediaUrl}`);
+
+    // 🔧 Track recipient (but don't modify @all here - let channel.ts handle it)
+    if (userId !== "@all") {
+      this.lastRecipient = userId;
+      console.log(`[WeCom Client] 📝 记录最后收件人: ${userId}`);
+    }
 
     // 1. Check Sync
     const pendingRes = this.pendingRequests.get(userId);

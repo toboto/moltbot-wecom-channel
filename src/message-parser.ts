@@ -76,6 +76,19 @@ export interface WeComLinkMessage extends WeComMessageBase {
 }
 
 /**
+ * 事件消息（进入应用、地理位置上报等）
+ */
+export interface WeComEventMessage extends WeComMessageBase {
+  MsgType: "event";
+  Event: string;          // 事件类型，如 enter_agent, LOCATION, subscribe 等
+  EventKey?: string;      // 事件KEY值
+  Latitude?: number;      // 地理位置纬度（LOCATION事件）
+  Longitude?: number;     // 地理位置经度（LOCATION事件）
+  Precision?: number;     // 地理位置精度（LOCATION事件）
+  AppType?: string;       // app类型
+}
+
+/**
  * 联合类型：所有支持的消息类型
  */
 export type WeComMessage =
@@ -84,7 +97,8 @@ export type WeComMessage =
   | WeComVoiceMessage
   | WeComVideoMessage
   | WeComLocationMessage
-  | WeComLinkMessage;
+  | WeComLinkMessage
+  | WeComEventMessage;
 
 /**
  * 解析企业微信 XML 消息
@@ -174,6 +188,18 @@ export function parseWeComMessage(xml: string): WeComMessage {
         PicUrl: String(msg.PicUrl || ""),
       } as WeComLinkMessage;
 
+    case "event":
+      return {
+        ...baseMessage,
+        MsgType: "event",
+        Event: String(msg.Event || ""),
+        EventKey: msg.EventKey ? String(msg.EventKey) : undefined,
+        Latitude: msg.Latitude ? Number(msg.Latitude) : undefined,
+        Longitude: msg.Longitude ? Number(msg.Longitude) : undefined,
+        Precision: msg.Precision ? Number(msg.Precision) : undefined,
+        AppType: msg.AppType ? String(msg.AppType) : undefined,
+      } as WeComEventMessage;
+
     default:
       throw new Error(`Unsupported message type: ${msg.MsgType}`);
   }
@@ -218,6 +244,12 @@ export function formatMessageForClawdbot(message: WeComMessage): {
       if (message.PicUrl) {
         mediaUrls.push(message.PicUrl);
       }
+      break;
+
+    case "event":
+      // 事件消息通常不需要发送给 agent，返回空文本
+      // 调用方应检查并跳过空文本的事件消息
+      text = "";
       break;
 
     default:

@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { verifySignature, decryptMessage, calculateSignature } from "./crypto.js";
 import { parseWeComMessage, formatMessageForClawdbot } from "./message-parser.js";
 import { XMLParser } from "fast-xml-parser";
+import { runInSessionContext } from "./session-context.js";
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -239,8 +240,12 @@ async function handleEncryptedWeComMessage(
   console.log(JSON.stringify(wecomMessage, null, 2));
 
   // 7. 转换为 Clawdbot 格式
-  const { text, mediaUrls } = formatMessageForClawdbot(wecomMessage);
+  let { text, mediaUrls } = formatMessageForClawdbot(wecomMessage);
   const userId = wecomMessage.FromUserName;
+
+  // 🔧 Set lastRecipient EARLY - before any dispatch
+  wecomClient.lastRecipient = userId;
+  console.log(`[WeCom Gateway] 📝 预设最后收件人: ${userId}`);
 
   console.log("=== WeCom Context to Agent ===");
   console.log("From:", userId);
@@ -256,9 +261,10 @@ async function handleEncryptedWeComMessage(
   // 9. 异步处理消息
   const systemPrompt = config.systemPrompt?.trim() || undefined;
 
-  // Dispatch
+  // Dispatch within session context
   const runtime = getWecomRuntime();
-  await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+  await runInSessionContext(userId, accountId, async () => {
+    await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
     ctx: {
       From: userId,
       Body: text,
@@ -301,6 +307,7 @@ async function handleEncryptedWeComMessage(
     },
     replyOptions: {},
   });
+  }); // End runInSessionContext
 }
 
 /**
@@ -384,6 +391,10 @@ async function handleLegacyMessage(
     }
   }
 
+  // 🔧 Set lastRecipient EARLY - before any dispatch
+  wecomClient.lastRecipient = email!;
+  console.log(`[WeCom Gateway] 📝 预设最后收件人: ${email}`);
+
   console.log("=== WeCom Context to Agent ===");
   console.log("From:", email);
   console.log("Body:", enrichedText);
@@ -395,9 +406,10 @@ async function handleLegacyMessage(
   const config = ctx.account.config as any;
   const systemPrompt = config.systemPrompt?.trim() || undefined;
 
-  // Dispatch
+  // Dispatch within session context
   const runtime = getWecomRuntime();
-  await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+  await runInSessionContext(email!, accountId, async () => {
+    await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
     ctx: {
       From: email,
       Body: enrichedText,
@@ -410,15 +422,70 @@ async function handleLegacyMessage(
     dispatcherOptions: {
       responsePrefix: "",
       deliver: async (payload) => {
-        console.log("=== WeCom Deliver Payload ===");
+        console.log("=== WeCom Deliver Payload (Gateway) ===");
         console.log("Text:", payload.text);
-        console.log("MediaUrl:", payload.mediaUrl);
+        console.log("MediaUrl (original):", payload.mediaUrl);
+
+        // 🔍 自动检测文件路径（如果 mediaUrl 未设置）
+        let mediaUrl = payload.mediaUrl;
+        if (!mediaUrl && payload.text) {
+          console.log("[Auto-detect] 开始检测文本中的文件路径...");
+
+          // 1. 匹配 markdown 图片语法: ![alt](path)
+          const markdownImageRegex = /!\[.*?\]\(([/~][^\s)]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr))\)/gi;
+          const markdownMatches = [...payload.text.matchAll(markdownImageRegex)];
+
+          if (markdownMatches && markdownMatches.length > 0) {
+            mediaUrl = markdownMatches[0][1];
+            console.log(`[Auto-detect] ✅ 检测到 Markdown 图片: ${mediaUrl}`);
+          } else {
+            // 2. 匹配文件路径模式
+            const filePathRegex = /[`'"]?([/~][^\s`'"]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr|pdf|zip|tar|gz))[`'"]?/gi;
+            const matches = [...payload.text.matchAll(filePathRegex)];
+
+            if (matches && matches.length > 0) {
+              mediaUrl = matches[0][1];
+              console.log(`[Auto-detect] ✅ 检测到文件路径: ${mediaUrl}`);
+            } else {
+              // 3. 如果消息提到截图但没找到路径，查找最近的截图文件
+              const screenshotKeywords = /截图|screenshot|已发送.*图|图.*已发送/i;
+              if (screenshotKeywords.test(payload.text)) {
+                console.log("[Auto-detect] 🔍 检测到截图关键词，查找最近的截图文件...");
+                try {
+                  const { execSync } = await import("child_process");
+                  const latestScreenshot = execSync(
+                    "ls -t /Users/wangrui/clawd/screenshot_*.png 2>/dev/null | head -1",
+                    { encoding: "utf8" }
+                  ).trim();
+                  if (latestScreenshot) {
+                    // 检查文件是否在最近 60 秒内创建
+                    const { statSync } = await import("fs");
+                    const stat = statSync(latestScreenshot);
+                    const ageMs = Date.now() - stat.mtimeMs;
+                    if (ageMs < 60000) {
+                      mediaUrl = latestScreenshot;
+                      console.log(`[Auto-detect] ✅ 找到最近截图 (${Math.round(ageMs/1000)}秒前): ${mediaUrl}`);
+                    } else {
+                      console.log(`[Auto-detect] ⚠️ 截图太旧 (${Math.round(ageMs/1000)}秒前)，跳过`);
+                    }
+                  }
+                } catch (e) {
+                  console.log("[Auto-detect] ❌ 查找截图文件失败:", e);
+                }
+              } else {
+                console.log("[Auto-detect] ❌ 未检测到文件路径");
+              }
+            }
+          }
+        }
+
+        console.log("MediaUrl (final):", mediaUrl);
         console.log("================================");
 
         const config = ctx.account.config as any;
         const msg: SimpleWecomMessage = {
           text: payload.text,
-          mediaUrl: payload.mediaUrl
+          mediaUrl: mediaUrl
         };
 
         await wecomClient.sendMessage(email!, msg, {
@@ -441,4 +508,5 @@ async function handleLegacyMessage(
     },
     replyOptions: {},
   });
+  }); // End runInSessionContext
 }
