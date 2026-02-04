@@ -2,7 +2,7 @@
 
 企业微信（WeCom/WeChat Work）频道插件，用于 [OpenClaw](https://openclaw.ai) / [Moltbot](https://github.com/moltbot/moltbot)。
 
-**基于 [@william.qian/simple-wecom](https://www.npmjs.com/package/@william.qian/simple-wecom)**，完全兼容 OpenClaw 2026.1.29+。
+**基于 [@william.qian/simple-wecom](https://www.npmjs.com/package/@william.qian/simple-wecom)**，完全兼容 OpenClaw 2026.2.2-3+。
 
 ## ✨ 特性
 
@@ -179,7 +179,59 @@ OpenClaw 会自动使用正确的配置创建定时任务，确保消息准时�
 - Channel key 和 plugin ID 都是 `wecom`（不是 `simple-wecom`）
 - 配置文件位置：`~/.openclaw/openclaw.json`（不是 `~/.clawdbot/clawdbot.json`）
 
-### 5. 重启 OpenClaw Gateway
+### 5. 配置腾讯云语音识别（可选）
+
+如果需要支持语音消息转文字，可以启用腾讯云 ASR（Automatic Speech Recognition）服务。
+
+#### 获取腾讯云 API 凭证
+
+1. 登录 [腾讯云控制台](https://console.cloud.tencent.com/)
+2. 访问 [访问管理 - API 密钥管理](https://console.cloud.tencent.com/cam/capi)
+3. 创建或查看 API 密钥，记录：
+   - **SecretId**
+   - **SecretKey**
+
+#### 在配置文件中启用 ASR
+
+在 `~/.openclaw/openclaw.json` 的 `wecom` 配置中添加 `asr` 配置项：
+
+```json
+{
+  "channels": {
+    "wecom": {
+      "enabled": true,
+      "corpid": "你的企业ID",
+      "corpsecret": "应用Secret",
+      "agentid": 1000002,
+      "token": "你设置的Token",
+      "encodingAESKey": "你生成的EncodingAESKey",
+      "asr": {
+        "enabled": true,
+        "secretId": "你的腾讯云SecretId",
+        "secretKey": "你的腾讯云SecretKey",
+        "region": "ap-shanghai",
+        "engineModelType": "16k_zh"
+      }
+    }
+  }
+}
+```
+
+#### ASR 配置参数说明
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `enabled` | boolean | 是 | - | 是否启用 ASR 服务 |
+| `secretId` | string | 是 | - | 腾讯云 API SecretId |
+| `secretKey` | string | 是 | - | 腾讯云 API SecretKey |
+| `region` | string | 否 | `ap-shanghai` | 腾讯云服务区域（如 `ap-shanghai`、`ap-beijing`、`ap-guangzhou` 等） |
+| `engineModelType` | string | 否 | `16k_zh` | 语音识别引擎模型类型（`16k_zh` 为 16k 中文普通话通用，`8k_zh` 为 8k 中文普通话通用） |
+
+#### 使用效果
+
+启用 ASR 后，在企业微信中发送语音消息，OpenClaw 会自动将语音转换为文字，然后由 AI 处理并回复。
+
+### 6. 重启 OpenClaw Gateway
 
 ```bash
 openclaw gateway restart
