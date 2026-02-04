@@ -23,6 +23,9 @@ export const SimpleWecomAccountConfigSchema = z.object({
   // 自定义系统提示词
   systemPrompt: z.string().optional().describe("自定义系统提示词片段"),
 
+  // 日志详细程度
+  verbose: z.boolean().optional().describe("是否输出详细日志（包括完整XML和JSON）"),
+
   // 腾讯云 ASR 语音识别配置（可选）
   tencentAsr: z.object({
     enabled: z.boolean().optional().describe("是否启用腾讯云语音识别"),

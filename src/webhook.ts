@@ -171,8 +171,12 @@ async function handleEncryptedWeComMessage(
   const rawBody = await readBody(req);
   const xmlString = rawBody.toString("utf8");
 
-  console.log("=== Received WeChat Encrypted Message ===");
-  console.log("XML:", xmlString);
+  const verbose = config.verbose === true;
+
+  if (verbose) {
+    console.log("=== Received WeChat Encrypted Message ===");
+    console.log("XML:", xmlString);
+  }
 
   // 3. Parse XML to extract Encrypt field
   const parser = new XMLParser({
@@ -203,8 +207,10 @@ async function handleEncryptedWeComMessage(
   let decryptedXml: string;
   try {
     decryptedXml = decryptMessage(encodingAESKey, encryptedMsg, corpid);
-    console.log("=== Decrypted Message XML ===");
-    console.log(decryptedXml);
+    if (verbose) {
+      console.log("=== Decrypted Message XML ===");
+      console.log(decryptedXml);
+    }
   } catch (error) {
     console.error("Decryption failed:", error);
     res.statusCode = 500;
@@ -214,12 +220,16 @@ async function handleEncryptedWeComMessage(
 
   // 6. Parse WeCom message
   const wecomMessage = parseWeComMessage(decryptedXml);
-  console.log("=== Parsed WeChat Message ===");
-  console.log(JSON.stringify(wecomMessage, null, 2));
+  if (verbose) {
+    console.log("=== Parsed WeChat Message ===");
+    console.log(JSON.stringify(wecomMessage, null, 2));
+  }
 
   // 6.1. Skip event messages (enter_agent, LOCATION, etc.)
   if (wecomMessage.MsgType === "event") {
-    console.log(`[WeCom] 跳过事件消息: ${(wecomMessage as any).Event}`);
+    if (verbose) {
+      console.log(`[WeCom] 跳过事件消息: ${(wecomMessage as any).Event}`);
+    }
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/plain");
     res.end("success");
@@ -229,13 +239,17 @@ async function handleEncryptedWeComMessage(
   // 6.5. Process voice message with ASR if configured
   let voiceTranscript: string | undefined;
   if (wecomMessage.MsgType === "voice") {
-    console.log("[Voice] 检测到语音消息");
-    console.log(`[Voice] MediaId: ${wecomMessage.MediaId}`);
-    console.log(`[Voice] Format: ${wecomMessage.Format}`);
+    if (verbose) {
+      console.log("[Voice] 检测到语音消息");
+      console.log(`[Voice] MediaId: ${wecomMessage.MediaId}`);
+      console.log(`[Voice] Format: ${wecomMessage.Format}`);
+    }
 
     const asrConfig = config.tencentAsr;
     if (asrConfig?.enabled && asrConfig.secretId && asrConfig.secretKey) {
-      console.log("[Voice] 腾讯云 ASR 已启用，开始语音识别...");
+      if (verbose) {
+        console.log("[Voice] 腾讯云 ASR 已启用，开始语音识别...");
+      }
 
       try {
         // Download voice file
@@ -251,7 +265,9 @@ async function handleEncryptedWeComMessage(
           `wecom-voice-${Date.now()}-${wecomMessage.MediaId}.${wecomMessage.Format || "amr"}`
         );
         await writeFile(tempFilePath, voiceBuffer);
-        console.log(`[Voice] ✓ 语音文件已保存: ${tempFilePath}`);
+        if (verbose) {
+          console.log(`[Voice] ✓ 语音文件已保存: ${tempFilePath}`);
+        }
 
         // Recognize voice
         const asrResult = await recognizeVoice(tempFilePath, {
@@ -263,7 +279,9 @@ async function handleEncryptedWeComMessage(
 
         if (asrResult.success && asrResult.text) {
           voiceTranscript = asrResult.text;
-          console.log(`[Voice] ✓ 语音识别成功: ${voiceTranscript}`);
+          if (verbose) {
+            console.log(`[Voice] ✓ 语音识别成功: ${voiceTranscript}`);
+          }
         } else {
           console.warn(`[Voice] ✗ 语音识别失败: ${asrResult.error}`);
         }
@@ -274,7 +292,9 @@ async function handleEncryptedWeComMessage(
         console.error("[Voice] 语音处理失败:", error);
       }
     } else {
-      console.log("[Voice] ASR 未配置或未启用，跳过语音识别");
+      if (verbose) {
+        console.log("[Voice] ASR 未配置或未启用，跳过语音识别");
+      }
     }
   }
 
@@ -284,16 +304,24 @@ async function handleEncryptedWeComMessage(
   // 7.5. Append voice transcript if available
   if (voiceTranscript) {
     text = `[语音内容]\n${voiceTranscript}`;
-    console.log("[Voice] ✓ 已将语音识别结果添加到消息中");
+    if (verbose) {
+      console.log("[Voice] ✓ 已将语音识别结果添加到消息中");
+    }
   }
 
   const userId = wecomMessage.FromUserName;
 
-  console.log("=== WeCom Context to Agent ===");
-  console.log("From:", userId);
-  console.log("Body:", text);
-  console.log("MediaUrls:", mediaUrls);
-  console.log("===================================");
+  // Log compact summary in non-verbose mode
+  if (!verbose) {
+    const contentPreview = (text || "").substring(0, 50) + ((text?.length || 0) > 50 ? "..." : "");
+    console.log(`[WeCom] 收到消息: From=${userId}, Type=${wecomMessage.MsgType}, Content=${contentPreview}`);
+  } else {
+    console.log("=== WeCom Context to Agent ===");
+    console.log("From:", userId);
+    console.log("Body:", text);
+    console.log("MediaUrls:", mediaUrls);
+    console.log("===================================");
+  }
 
   // 8. Return success immediately (WeCom requires response within 5 seconds)
   res.statusCode = 200;
@@ -319,9 +347,11 @@ async function handleEncryptedWeComMessage(
     dispatcherOptions: {
       responsePrefix: "",
       deliver: async (payload) => {
-        console.log("=== WeCom Deliver Payload ===");
-        console.log("Text:", payload.text?.substring(0, 100));
-        console.log("MediaUrl:", payload.mediaUrl);
+        if (verbose) {
+          console.log("=== WeCom Deliver Payload ===");
+          console.log("Text:", payload.text?.substring(0, 100));
+          console.log("MediaUrl:", payload.mediaUrl);
+        }
 
         // 🔍 自动检测文件路径（如果 mediaUrl 未设置）
         let mediaUrl = payload.mediaUrl;
@@ -332,7 +362,9 @@ async function handleEncryptedWeComMessage(
 
           if (markdownMatches && markdownMatches.length > 0) {
             mediaUrl = markdownMatches[0][1];
-            console.log(`[Auto-detect] ✅ 检测到 Markdown 图片: ${mediaUrl}`);
+            if (verbose) {
+              console.log(`[Auto-detect] ✅ 检测到 Markdown 图片: ${mediaUrl}`);
+            }
           } else {
             // 2. 匹配文件路径模式 (支持反引号、引号包裹的路径)
             const filePathRegex = /[`'"]?([/~][^\s`'"<>]+\.(?:png|jpg|jpeg|gif|webp|bmp|mp4|avi|mov|mp3|wav|amr|pdf))[`'"]?/gi;
@@ -340,12 +372,16 @@ async function handleEncryptedWeComMessage(
 
             if (matches && matches.length > 0) {
               mediaUrl = matches[0][1];
-              console.log(`[Auto-detect] ✅ 检测到文件路径: ${mediaUrl}`);
+              if (verbose) {
+                console.log(`[Auto-detect] ✅ 检测到文件路径: ${mediaUrl}`);
+              }
             }
           }
         }
 
-        console.log("MediaUrl (final):", mediaUrl);
+        if (verbose) {
+          console.log("MediaUrl (final):", mediaUrl);
+        }
 
         const msg: SimpleWecomMessage = {
           text: payload.text,
@@ -365,6 +401,13 @@ async function handleEncryptedWeComMessage(
           token: config.token,
           encodingAESKey: config.encodingAESKey
         });
+
+        // Log compact summary in non-verbose mode
+        if (!verbose) {
+          const textPreview = (payload.text || "").substring(0, 50) + ((payload.text?.length || 0) > 50 ? "..." : "");
+          const mediaInfo = mediaUrl ? `, Media=${mediaUrl.split('/').pop()}` : "";
+          console.log(`[WeCom] 发送回复: To=${userId}${mediaInfo}, Text=${textPreview}`);
+        }
       },
       onError: (err) => {
         console.error("WeCom dispatch error:", err);
@@ -372,7 +415,7 @@ async function handleEncryptedWeComMessage(
     },
     replyOptions: {},
   });
-  }); // End runInSessionContext
+  }, verbose); // End runInSessionContext
 }
 
 /**
@@ -386,6 +429,7 @@ async function handleLegacyMessage(
   accountId: string,
   cfg: any,
 ) {
+  const verbose = config.verbose === true;
   let email: string | undefined;
   let text: string | undefined;
   let imageUrl: string | undefined;
@@ -460,12 +504,18 @@ async function handleLegacyMessage(
   // 🔧 Add hidden instruction for recipient targeting
   enrichedText = `${enrichedText}\n\n[系统提示：如果需要发送媒体文件（图片/视频/音频等），接收者ID为: ${email}]`;
 
-  console.log("=== WeCom Context to Agent ===");
-  console.log("From:", email);
-  console.log("Body:", enrichedText);
-  console.log("MediaUrls:", mediaUrls);
-  console.log("Files count:", files.length);
-  console.log("===================================");
+  // Log compact summary in non-verbose mode
+  if (!verbose) {
+    const textPreview = (text || "").substring(0, 50) + ((text?.length || 0) > 50 ? "..." : "");
+    console.log(`[WeCom Legacy] 收到消息: From=${email}, Files=${files.length}, Content=${textPreview}`);
+  } else {
+    console.log("=== WeCom Context to Agent ===");
+    console.log("From:", email);
+    console.log("Body:", enrichedText);
+    console.log("MediaUrls:", mediaUrls);
+    console.log("Files count:", files.length);
+    console.log("===================================");
+  }
 
   // Read systemPrompt from config
   const systemPrompt = config.systemPrompt?.trim() || undefined;
@@ -486,10 +536,12 @@ async function handleLegacyMessage(
     dispatcherOptions: {
       responsePrefix: "",
       deliver: async (payload) => {
-        console.log("=== WeCom Deliver Payload ===");
-        console.log("Text:", payload.text);
-        console.log("MediaUrl:", payload.mediaUrl);
-        console.log("================================");
+        if (verbose) {
+          console.log("=== WeCom Deliver Payload ===");
+          console.log("Text:", payload.text);
+          console.log("MediaUrl:", payload.mediaUrl);
+          console.log("================================");
+        }
 
         const msg: SimpleWecomMessage = {
           text: payload.text,
@@ -509,6 +561,13 @@ async function handleLegacyMessage(
           token: config.token,
           encodingAESKey: config.encodingAESKey
         });
+
+        // Log compact summary in non-verbose mode
+        if (!verbose) {
+          const textPreview = (payload.text || "").substring(0, 50) + ((payload.text?.length || 0) > 50 ? "..." : "");
+          const mediaInfo = payload.mediaUrl ? `, Media=${payload.mediaUrl.split('/').pop()}` : "";
+          console.log(`[WeCom Legacy] 发送回复: To=${email}${mediaInfo}, Text=${textPreview}`);
+        }
       },
       onError: (err) => {
         console.error("WeCom dispatch error:", err);
@@ -516,5 +575,5 @@ async function handleLegacyMessage(
     },
     replyOptions: {},
   });
-  }); // End runInSessionContext
+  }, verbose); // End runInSessionContext
 }

@@ -18,24 +18,31 @@ const asyncLocalStorage = new AsyncLocalStorage<SessionContext>();
 export function runInSessionContext<T>(
   userId: string,
   accountId: string,
-  callback: () => T
+  callback: () => T,
+  verbose = false
 ): T {
   const context: SessionContext = { userId, accountId };
-  console.log(`[Session Context] 🔧 设置会话上下文: userId=${userId}, accountId=${accountId}`);
+  if (verbose) {
+    console.log(`[Session Context] 🔧 设置会话上下文: userId=${userId}, accountId=${accountId}`);
+  }
   return asyncLocalStorage.run(context, callback);
 }
 
 /**
  * Get the current session's user ID
  */
-export function getCurrentUserId(): string | null {
+export function getCurrentUserId(verbose = false): string | null {
   const context = asyncLocalStorage.getStore();
 
   if (context) {
-    console.log(`[Session Context] ✅ 获取当前用户: ${context.userId}`);
+    if (verbose) {
+      console.log(`[Session Context] ✅ 获取当前用户: ${context.userId}`);
+    }
     return context.userId;
   }
 
-  console.log(`[Session Context] ❌ 无会话上下文`);
+  if (verbose) {
+    console.log(`[Session Context] ❌ 无会话上下文`);
+  }
   return null;
 }

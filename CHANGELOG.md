@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.2] - 2026-02-04
+
+### Added
+
+- **日志详细度控制**：添加 `verbose` 配置选项，优化日志输出
+  - 默认模式（`verbose: false`）：仅输出简洁的核心信息（收到/发送消息的单行摘要）
+  - 详细模式（`verbose: true`）：输出完整的 XML、JSON 和处理过程日志
+  - 显著减少日志噪音，便于生产环境监控
+
+### Changed
+
+- **简化日志格式**：非详细模式下，每条消息仅记录一行核心信息
+  - 收到消息：`[WeCom] 收到消息: From=用户, Type=类型, Content=内容预览...`
+  - 发送回复：`[WeCom] 发送回复: To=用户, Media=文件名, Text=内容预览...`
+
+### Technical Details
+
+修改文件：
+- `src/config-schema.ts` - 添加 `verbose` 配置字段
+- `src/webhook.ts` - 根据 verbose 配置控制所有日志输出
+- `src/session-context.ts` - 添加 verbose 参数支持
+
+---
+
 ## [1.5.0] - 2026-02-04
 
 ### Added
