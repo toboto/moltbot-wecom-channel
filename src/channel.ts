@@ -106,14 +106,8 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
         // 🔧 Fix recipient when OpenClaw sends @all
         let recipient = to;
         if (to === "@all") {
-            // Try AsyncLocalStorage first
+            // Try AsyncLocalStorage
             let currentUserId = getCurrentUserId();
-
-            // Fallback to last known recipient
-            if (!currentUserId && wecomClient.lastRecipient) {
-                currentUserId = wecomClient.lastRecipient;
-                console.log(`[WeCom Channel] 🔧 使用最后收件人: ${currentUserId}`);
-            }
 
             if (currentUserId) {
                 recipient = currentUserId;
@@ -173,14 +167,8 @@ export const wecomPlugin: ChannelPlugin<ResolvedWecomAccount> = {
         // 🔧 Fix recipient when OpenClaw sends @all
         let recipient = to;
         if (to === "@all") {
-            // Try AsyncLocalStorage first
+            // Try AsyncLocalStorage
             let currentUserId = getCurrentUserId();
-
-            // Fallback to last known recipient
-            if (!currentUserId && wecomClient.lastRecipient) {
-                currentUserId = wecomClient.lastRecipient;
-                console.log(`[WeCom Channel] 🔧 使用最后收件人: ${currentUserId}`);
-            }
 
             if (currentUserId) {
                 recipient = currentUserId;

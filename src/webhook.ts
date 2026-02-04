@@ -289,10 +289,6 @@ async function handleEncryptedWeComMessage(
 
   const userId = wecomMessage.FromUserName;
 
-  // 🔧 Set lastRecipient EARLY - before any dispatch
-  wecomClient.lastRecipient = userId;
-  console.log(`[WeCom Webhook] 📝 预设最后收件人: ${userId}`);
-
   console.log("=== WeCom Context to Agent ===");
   console.log("From:", userId);
   console.log("Body:", text);
