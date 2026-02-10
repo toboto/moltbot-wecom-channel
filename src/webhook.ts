@@ -298,6 +298,44 @@ async function handleEncryptedWeComMessage(
     }
   }
 
+  // 6.7. Download image (if image message)
+  let imagePath: string | undefined;
+  if (wecomMessage.MsgType === "image") {
+    if (verbose) {
+      console.log("[Image] 检测到图片消息");
+      console.log(`[Image] MediaId: ${wecomMessage.MediaId}`);
+      console.log(`[Image] PicUrl: ${wecomMessage.PicUrl}`);
+    }
+
+    try {
+      // Download image using MediaId (more reliable than PicUrl)
+      const imageBuffer = await wecomOfficialAPI.downloadMedia(
+        config.corpid,
+        config.corpsecret,
+        wecomMessage.MediaId
+      );
+
+      // Save to temp file
+      const tempFilePath = join(
+        tmpdir(),
+        `wecom-image-${Date.now()}-${wecomMessage.MediaId}.jpg`
+      );
+      await writeFile(tempFilePath, imageBuffer);
+      imagePath = tempFilePath;
+
+      if (verbose) {
+        console.log(`[Image] ✓ 图片文件已保存: ${tempFilePath}`);
+        console.log(`[Image] ✓ 文件大小: ${imageBuffer.length} bytes`);
+      }
+    } catch (error) {
+      console.error("[Image] 图片下载失败:", error);
+      if (verbose) {
+        console.log("[Image] ⚠ 将回退到使用 PicUrl");
+      }
+      // Will fall back to PicUrl in formatMessageForClawdbot
+    }
+  }
+
   // 7. Convert to Clawdbot format
   let { text, mediaUrls } = formatMessageForClawdbot(wecomMessage);
 
@@ -320,6 +358,7 @@ async function handleEncryptedWeComMessage(
     console.log("From:", userId);
     console.log("Body:", text);
     console.log("MediaUrls:", mediaUrls);
+    console.log("MediaPaths:", imagePath ? [imagePath] : undefined);
     console.log("===================================");
   }
 
@@ -340,7 +379,8 @@ async function handleEncryptedWeComMessage(
       Body: text,
       AccountId: accountId,
       SessionKey: `wecom:${accountId}:${userId}`,
-      MediaUrls: mediaUrls,
+      MediaUrls: imagePath ? undefined : mediaUrls, // Use local path if available
+      MediaPaths: imagePath ? [imagePath] : undefined, // Prefer local path over URL
       GroupSystemPrompt: systemPrompt,
     },
     cfg,

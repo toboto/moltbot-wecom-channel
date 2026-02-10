@@ -221,7 +221,8 @@ export function formatMessageForClawdbot(message: WeComMessage): {
       break;
 
     case "image":
-      text = "[图片消息]";
+      // Provide more context for better LLM understanding
+      text = `[图片消息]\nMediaId: ${message.MediaId}`;
       if (message.PicUrl) {
         mediaUrls.push(message.PicUrl);
       }

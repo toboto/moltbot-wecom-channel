@@ -42,3 +42,11 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Private documentation (contains sensitive deployment info)
+PHASE1_INSTRUCTIONS.md
+VERBOSE_CONFIG_GUIDE.md
+IMPLEMENTATION_SUMMARY.md
+TESTING_GUIDE.md
+QUICK_REFERENCE.md
+CHANGELOG_IMAGE_FIX.md

@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-02-10
+
+### Added
+
+- **图片下载功能**：新增通过 MediaId 下载图片到本地临时文件
+  - 使用企业微信官方 API `downloadMedia()` 下载高清原图
+  - 保存到 `/tmp/wecom-image-{timestamp}-{MediaId}.jpg`
+  - 自动回退：下载失败时使用 PicUrl
+
+- **MediaPaths 支持**：在消息分发时添加 `MediaPaths` 字段
+  - 优先使用本地文件路径而非远程 URL
+  - 提高图片处理的可靠性和质量
+
+- **详细日志**：新增图片处理相关的调试日志（需启用 verbose）
+  - `[Image]` 前缀的日志输出
+  - 记录 MediaId、PicUrl、文件路径、文件大小
+
+### Changed
+
+- **图片消息文本**：从 `[图片消息]` 改为 `[图片消息]\nMediaId: {MediaId}`
+  - 为 LLM 提供更多上下文信息
+
+### Fixed
+
+- **图片理解准确性**：通过 MediaId 下载高清原图，避免 PicUrl 过期、压缩或访问限制问题
+- **图片质量问题**：使用官方 API 确保获取原始质量图片
+
+### Technical Details
+
+修改文件：
+- `src/webhook.ts` - 新增图片下载逻辑（lines 301-337）、修改消息分发（lines 382-383）
+- `src/message-parser.ts` - 改进图片消息文本标记（lines 224-229）
+
+---
+
 ## [1.5.2] - 2026-02-04
 
 ### Added
