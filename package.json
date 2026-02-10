@@ -24,12 +24,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/toboto/moltbot-wecom-channel.git"
+    "url": "https://github.com/toboto/openclaw-wecom-channel.git"
   },
   "bugs": {
-    "url": "https://github.com/toboto/moltbot-wecom-channel/issues"
+    "url": "https://github.com/toboto/openclaw-wecom-channel/issues"
   },
-  "homepage": "https://github.com/toboto/moltbot-wecom-channel#readme",
+  "homepage": "https://github.com/toboto/openclaw-wecom-channel#readme",
   "publishConfig": {
     "access": "public"
   },

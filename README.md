@@ -41,14 +41,14 @@ npm install -g @tobotorui/openclaw-wecom-channel
 ### 方式 2：从 GitHub 安装
 
 ```bash
-openclaw plugins install https://github.com/toboto/moltbot-wecom-channel
+openclaw plugins install https://github.com/toboto/openclaw-wecom-channel
 ```
 
 ### 方式 3：本地开发安装
 
 ```bash
-git clone https://github.com/toboto/moltbot-wecom-channel.git
-cd moltbot-wecom-channel
+git clone https://github.com/toboto/openclaw-wecom-channel.git
+cd openclaw-wecom-channel
 openclaw plugins install . --link
 ```
 
@@ -65,7 +65,7 @@ openclaw plugins install . --link
 cp -r skills/file-attachment ~/.openclaw/skills/
 
 # 方式 2: 直接从 GitHub 安装
-git clone https://github.com/toboto/moltbot-wecom-channel.git /tmp/wecom-plugin
+git clone https://github.com/toboto/openclaw-wecom-channel.git /tmp/wecom-plugin
 cp -r /tmp/wecom-plugin/skills/file-attachment ~/.openclaw/skills/
 rm -rf /tmp/wecom-plugin
 ```
@@ -99,7 +99,7 @@ Agent 会自动在回复中包含文件路径（如 `![截图](/path/to/screensh
 cp -r skills/wecom-reminder ~/.openclaw/skills/
 
 # 方式 2: 直接从 GitHub 安装
-git clone https://github.com/toboto/moltbot-wecom-channel.git /tmp/wecom-plugin
+git clone https://github.com/toboto/openclaw-wecom-channel.git /tmp/wecom-plugin
 cp -r /tmp/wecom-plugin/skills/wecom-reminder ~/.openclaw/skills/
 rm -rf /tmp/wecom-plugin
 ```
@@ -267,8 +267,8 @@ openclaw channels status
 
 ```bash
 # 克隆仓库
-git clone https://github.com/toboto/moltbot-wecom-channel.git
-cd moltbot-wecom-channel
+git clone https://github.com/toboto/openclaw-wecom-channel.git
+cd openclaw-wecom-channel
 
 # 安装依赖
 npm install
@@ -293,4 +293,4 @@ MIT License - 基于 [@william.qian/simple-wecom](https://www.npmjs.com/package/
 ## 📮 联系方式
 
 - GitHub: [@toboto](https://github.com/toboto)
-- 问题反馈：[GitHub Issues](https://github.com/toboto/moltbot-wecom-channel/issues)
+- 问题反馈：[GitHub Issues](https://github.com/toboto/openclaw-wecom-channel/issues)
